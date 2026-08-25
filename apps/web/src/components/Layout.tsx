@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { LayoutDashboard, BookOpen, BarChart3, Users, Settings2, LogOut } from "lucide-react";
 
 export default function Layout({children}:{children:any}){
   const {user, logout}=useAuth();
@@ -14,11 +15,11 @@ export default function Layout({children}:{children:any}){
           <div><div className="font-bold leading-none">OMNI</div><div className="text-xs text-zinc-500">E-Learning</div></div>
         </div>
         <nav className="p-3 flex-1 space-y-1 text-sm">
-          <Link to="/" className="flex gap-2 px-3 py-2 rounded-lg hover:bg-zinc-100">🏠 Dashboard</Link>
-          <Link to="/courses" className="flex gap-2 px-3 py-2 rounded-lg hover:bg-zinc-100">📚 {isMhs?"Matkul Saya":"Matkul"}</Link>
-          { (isDosen||isAdmin) && <Link to="/rekap" className="flex gap-2 px-3 py-2 rounded-lg hover:bg-zinc-100">📊 Rekap Progress</Link> }
-          { isAdmin && <Link to="/users" className="flex gap-2 px-3 py-2 rounded-lg hover:bg-zinc-100">👥 Kelola User</Link> }
-          { (isDosen||isAdmin) && <Link to="/manage" className="flex gap-2 px-3 py-2 rounded-lg hover:bg-zinc-100">🛠️ Kelola Materi & Quiz</Link> }
+          <Link to="/" className="flex gap-2 items-center px-3 py-2 rounded-lg hover:bg-zinc-100"><LayoutDashboard size={18} strokeWidth={1.8} /> Dashboard</Link>
+          <Link to="/courses" className="flex gap-2 items-center px-3 py-2 rounded-lg hover:bg-zinc-100"><BookOpen size={18} strokeWidth={1.8} /> {isMhs?"Matkul Saya":"Matkul"}</Link>
+          { (isDosen||isAdmin) && <Link to="/rekap" className="flex gap-2 items-center px-3 py-2 rounded-lg hover:bg-zinc-100"><BarChart3 size={18} strokeWidth={1.8} /> Rekap Progress</Link> }
+          { isAdmin && <Link to="/users" className="flex gap-2 items-center px-3 py-2 rounded-lg hover:bg-zinc-100"><Users size={18} strokeWidth={1.8} /> Kelola User</Link> }
+          { (isDosen||isAdmin) && <Link to="/manage" className="flex gap-2 items-center px-3 py-2 rounded-lg hover:bg-zinc-100"><Settings2 size={18} strokeWidth={1.8} /> Kelola Materi & Quiz</Link> }
         </nav>
         <div className="p-3 border-t">
           <div className="text-sm font-medium">{user.name}</div>
