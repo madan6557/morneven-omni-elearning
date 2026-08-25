@@ -1,5 +1,7 @@
 # OMNI E-Learning — Monorepo (Vite + Express)
 
+> **Dokumentasi lengkap:** `docs/README.md` · **Integrasi SI Utama:** `docs/INTEGRATION.md` · **API:** `docs/API.md`
+
 Monorepo `pnpm workspaces + Turborepo` untuk kolaborasi 2 dev (FE Vite, BE Express). Goal: materi tersampaikan & progress terlacak (download, slide, video, quiz pre/post).
 
 ## Struktur
