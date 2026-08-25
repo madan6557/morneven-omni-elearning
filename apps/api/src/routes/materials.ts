@@ -1,0 +1,72 @@
+import { Router } from "express";
+import path from "path";
+import fs from "fs";
+import multer from "multer";
+import { prisma } from "../lib/prisma.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
+import { CreateMaterialSchema } from "@repo/shared";
+const r = Router();
+const uploadDir = process.env.UPLOAD_DIR || "./uploads";
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+const storage = multer.diskStorage({
+  destination: (_req,_file,cb)=>cb(null,uploadDir),
+  filename: (_req,file,cb)=>cb(null, Date.now()+"-"+file.originalname.replace(/\s+/g,"_"))
+});
+const upload = multer({ storage, limits:{ fileSize: 500*1024*1024 } });
+
+// create material
+r.post("/", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
+  const parsed = CreateMaterialSchema.safeParse(req.body);
+  if(!parsed.success) return res.status(400).json(parsed.error);
+  const m = await prisma.material.create({ data: parsed.data });
+  res.status(201).json(m);
+});
+
+// upload file then create material
+r.post("/upload", requireAuth as any, requireRole("ADMIN","DOSEN") as any, upload.single("file"), async (req:any,res)=>{
+  if(!req.file) return res.status(400).json({message:"file required"});
+  const { moduleId, title, type } = req.body;
+  if(!moduleId || !title || !type) return res.status(400).json({message:"moduleId, title, type required"});
+  const sourceUrl = `/uploads/${req.file.filename}`;
+  const totalPages = type==="PDF" ? Number(req.body.totalPages||12) : undefined;
+  const m = await prisma.material.create({ data:{ moduleId, title, type, sourceType:"upload", sourceUrl, totalPages, duration: type==="VIDEO"? Number(req.body.duration||0): undefined } });
+  res.status(201).json(m);
+});
+
+r.get("/:id", requireAuth as any, async (req,res)=>{
+  const m = await prisma.material.findUnique({ where:{id:req.params.id}, include:{ module:true }});
+  if(!m) return res.status(404).json({message:"Not found"});
+  res.json(m);
+});
+
+r.put("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
+  const m = await prisma.material.update({ where:{id:req.params.id}, data:req.body });
+  res.json(m);
+});
+
+r.delete("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
+  await prisma.material.delete({ where:{id:req.params.id}});
+  res.json({ok:true});
+});
+
+// download tracking — ponytail: single endpoint logs then streams/redirects
+r.get("/:id/download", requireAuth as any, async (req:any,res)=>{
+  const m = await prisma.material.findUnique({ where:{id:req.params.id}});
+  if(!m) return res.status(404).json({message:"Not found"});
+  await prisma.materialDownload.create({ data:{ userId:req.user.id, materialId:m.id }});
+  // if upload file, stream it; if youtube/drive, redirect
+  if(m.sourceType==="upload" && m.sourceUrl.startsWith("/uploads/")){
+    const fp = path.join(process.cwd(), m.sourceUrl.replace(/^\//,""));
+    if(fs.existsSync(fp)) return res.download(fp, path.basename(fp));
+  }
+  // external
+  if(m.sourceUrl.startsWith("http")) return res.redirect(m.sourceUrl);
+  res.json({ message:"download logged", sourceUrl:m.sourceUrl });
+});
+
+r.get("/:id/downloads", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
+  const logs = await prisma.materialDownload.findMany({ where:{materialId:req.params.id}, include:{ user:{ select:{ nim:true, name:true }}}, orderBy:{ downloadedAt:"desc"}});
+  res.json(logs);
+});
+
+export default r;

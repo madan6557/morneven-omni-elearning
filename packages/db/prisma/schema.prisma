@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+  // prod postgres:
+  // provider = "postgresql"
+  // url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String   @id @default(cuid())
+  nim        String   @unique
+  name       String
+  password   String
+  role       String   @default("MAHASISWA") // ADMIN | DOSEN | MAHASISWA — ponytail: String for sqlite compat, enum for postgres
+  externalId String?  @unique
+  createdAt  DateTime @default(now())
+
+  enrollments        Enrollment[]
+  downloads          MaterialDownload[]
+  videoProgress      VideoProgress[]
+  slideProgress      SlideProgress[]
+  quizAttempts       QuizAttempt[]
+
+  @@index([role])
+}
+
+model Course {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  externalId  String?  @unique
+  createdAt   DateTime @default(now())
+  modules     Module[]
+  enrollments Enrollment[]
+  quizzes     Quiz[] // pretest per course
+}
+
+model Module {
+  id        String   @id @default(cuid())
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title     String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  materials Material[]
+  quizzes   Quiz[]
+
+  @@index([courseId])
+  @@unique([courseId, order])
+}
+
+model Material {
+  id         String       @id @default(cuid())
+  moduleId   String
+  module     Module       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title      String
+  type       String // VIDEO | PDF | PPT
+  sourceType String // youtube | drive | upload
+  sourceUrl  String // yt id / drive id / /uploads/xxx
+  duration   Int? // seconds for video
+  totalPages Int? // for PDF
+  order      Int          @default(0)
+  externalId String?      @unique
+  createdAt  DateTime     @default(now())
+
+  downloads     MaterialDownload[]
+  videoProgress VideoProgress[]
+  slideProgress SlideProgress[]
+
+  @@index([moduleId])
+}
+
+model Enrollment {
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  enrolledAt DateTime @default(now())
+
+  @@id([userId, courseId])
+  @@index([courseId])
+}
+
+// ponytail: 1 row per user+material, upsert is cheaper than event stream
+model MaterialDownload {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  downloadedAt DateTime @default(now())
+
+  @@index([userId, materialId])
+  @@index([materialId])
+}
+
+model VideoProgress {
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  materialId   String
+  material     Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  watchedSec   Int      @default(0)
+  lastPosition Int      @default(0)
+  percent      Float    @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@id([userId, materialId])
+}
+
+model SlideProgress {
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  materialId  String
+  material    Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  viewedPages String   @default("[]") // ponytail: Json for postgres, String for sqlite dev (JSON.parse)
+  currentPage Int      @default(1)
+  percent     Float    @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@id([userId, materialId])
+}
+
+model Quiz {
+  id           String   @id @default(cuid())
+  courseId     String?
+  course       Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  moduleId     String?
+  module       Module?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title        String
+  kind         String   @default("QUIZ") // PRETEST | POSTTEST | QUIZ
+  passingScore Int      @default(60)
+  timeLimit    Int? // minutes, null = no limit
+  attemptLimit Int      @default(1)
+  createdAt    DateTime @default(now())
+
+  questions Question[]
+  attempts  QuizAttempt[]
+
+  @@index([courseId])
+  @@index([moduleId])
+}
+
+model Question {
+  id           String @id @default(cuid())
+  quizId       String
+  quiz         Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  order        Int    @default(0)
+  text         String
+  options      String // JSON stringify ["A","B","C","D"] for sqlite compat
+  correctIndex Int
+  points       Int    @default(10)
+
+  @@index([quizId])
+}
+
+model QuizAttempt {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizId      String
+  quiz        Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  score       Float     @default(0)
+  passed      Boolean   @default(false)
+  answers     String    @default("[]") // JSON stringify [{questionId, chosen}]
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+
+  @@index([userId, quizId])
+  @@index([quizId])
+}

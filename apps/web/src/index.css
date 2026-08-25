@@ -1,0 +1,6 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+* { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+.progress { @apply h-2 rounded-full bg-zinc-200 overflow-hidden; }
+.progress > div { @apply h-full bg-gradient-to-r from-[#F88944] to-[#884892] transition-all; }
