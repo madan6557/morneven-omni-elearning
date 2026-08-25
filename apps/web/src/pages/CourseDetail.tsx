@@ -80,7 +80,7 @@ export default function CourseDetail(){
 
       <div className="flex gap-2">
         {user?.role!=="MAHASISWA" && <Link to="/manage" className="px-4 py-2 rounded-lg bg-zinc-900 text-white text-sm">Kelola Materi & Quiz</Link>}
-        <Link to="/rekap" className="px-4 py-2 rounded-lg bg-white border text-sm">Lihat Rekap Progress</Link>
+        {user?.role!=="MAHASISWA" && <Link to="/rekap" className="px-4 py-2 rounded-lg bg-white border text-sm">Lihat Rekap Progress</Link>}
       </div>
     </div>
   )
