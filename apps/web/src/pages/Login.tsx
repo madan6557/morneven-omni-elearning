@@ -30,8 +30,8 @@ export default function Login(){
           <div>Mahasiswa: 2025001 / password123</div>
         </div>
       </div>
-      <div className="flex items-center justify-center p-6 bg-[#F8F7FC]">
-        <form onSubmit={submit} className="w-full max-w-sm bg-white rounded-2xl border p-6 space-y-4">
+      <div className="flex items-center justify-center p-6 bg-[#F8F7FC] dark:bg-zinc-900">
+        <form onSubmit={submit} className="w-full max-w-sm bg-white dark:bg-zinc-800 dark:border-zinc-700 rounded-2xl border p-6 space-y-4">
           <div className="flex items-center gap-3 md:hidden"><img src="/omni-logo.svg" className="w-9 h-9"/><span className="font-bold">OMNI</span></div>
           <h2 className="text-xl font-bold">Masuk</h2>
           <p className="text-sm text-zinc-500">Gunakan NIM sebagai username.</p>
