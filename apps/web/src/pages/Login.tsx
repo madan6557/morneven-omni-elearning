@@ -1,4 +1,4 @@
-﻿import { ArrowRight, BookOpen, CheckCircle2, ChevronDown, ShieldCheck, Sparkles } from "lucide-react";
+﻿import { ArrowRight, BookOpen, CheckCircle, ChevronDown, ShieldCheck, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
@@ -45,7 +45,7 @@ export default function Login() {
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-xs font-semibold text-violet-100"><Sparkles size={14} /> The focused learning platform</div>
           <h1 className="text-5xl font-bold leading-[1.08] tracking-tight xl:text-6xl">Belajar lebih tenang. Bertumbuh lebih konsisten.</h1>
           <p className="mt-6 max-w-lg text-base leading-7 text-zinc-300">Materi tersampaikan, progress terlacak. Satu ruang untuk video, PDF, presentasi, dan evaluasi pembelajaran.</p>
-          <div className="mt-8 grid gap-3 text-sm text-zinc-200 sm:grid-cols-3"><span className="flex items-center gap-2"><CheckCircle2 size={16} className="text-orange-300" /> Materi terstruktur</span><span className="flex items-center gap-2"><CheckCircle2 size={16} className="text-orange-300" /> Progress terukur</span><span className="flex items-center gap-2"><CheckCircle2 size={16} className="text-orange-300" /> Evaluasi jelas</span></div>
+          <div className="mt-8 grid gap-3 text-sm text-zinc-200 sm:grid-cols-3"><span className="flex items-center gap-2"><CheckCircle size={16} className="text-orange-300" /> Materi terstruktur</span><span className="flex items-center gap-2"><CheckCircle size={16} className="text-orange-300" /> Progress terukur</span><span className="flex items-center gap-2"><CheckCircle size={16} className="text-orange-300" /> Evaluasi jelas</span></div>
         </div>
         <p className="relative text-xs text-zinc-500">OMNI E-Learning Â· Ruang belajar yang lebih bermakna</p>
       </section>

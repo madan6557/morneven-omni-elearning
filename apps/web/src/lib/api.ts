@@ -1,27 +1,39 @@
 ﻿import axios from "axios";
-// @ts-ignore - vite types
-const API_BASE_URL = ((import.meta as any).env?.VITE_API_URL || "").trim();
+
+const API_BASE_URL = import.meta.env.VITE_API_URL?.trim() || "";
 const api = axios.create({ baseURL: API_BASE_URL });
-api.interceptors.request.use(cfg=>{
-  const t = localStorage.getItem("token");
-  if(t) cfg.headers.Authorization = `Bearer ${t}`;
+
+api.interceptors.request.use((cfg) => {
+  const token = localStorage.getItem("token");
+  if (token) cfg.headers.Authorization = `Bearer ${token}`;
   return cfg;
 });
+
+api.interceptors.response.use((response) => {
+  if (typeof response.data === "string" && response.data.trimStart().startsWith("<")) {
+    return Promise.reject(new Error("API returned HTML instead of JSON. Check VITE_API_URL."));
+  }
+  return response;
+});
+
 export default api;
 
-// helpers
-export function ytId(url:string){
-  try{
+export function ytId(url: string) {
+  try {
     const u = new URL(url);
-    if(u.hostname.includes("youtu.be")) return u.pathname.slice(1);
+    if (u.hostname.includes("youtu.be")) return u.pathname.slice(1);
     return u.searchParams.get("v") || "";
-  } catch { return "" }
+  } catch {
+    return "";
+  }
 }
-export function ytEmbed(url:string){
-  const id = ytId(url); return id ? `https://www.youtube.com/embed/${id}` : url;
+
+export function ytEmbed(url: string) {
+  const id = ytId(url);
+  return id ? `https://www.youtube.com/embed/${id}` : url;
 }
-export function driveEmbed(url:string){
-  // https://drive.google.com/file/d/ID/view
-  const m = url.match(/\/d\/([^\/]+)/);
-  return m ? `https://drive.google.com/file/d/${m[1]}/preview` : url;
+
+export function driveEmbed(url: string) {
+  const match = url.match(/\/d\/([^\/]+)/);
+  return match ? `https://drive.google.com/file/d/${match[1]}/preview` : url;
 }
