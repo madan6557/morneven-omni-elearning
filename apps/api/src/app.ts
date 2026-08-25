@@ -10,8 +10,10 @@ import quizRoutes from "./routes/quizzes.js";
 
 export function createApp() {
   const app = express();
-  const origin = process.env.CORS_ORIGIN || "http://localhost:5173";
-  app.use(cors({ origin: origin.split(","), credentials: true }));
+  const raw = process.env.CORS_ORIGIN || "http://localhost:5173";
+  const origins = raw.replace(/"/g, "").split(",").map(s=>s.trim()).filter(Boolean);
+  // ponytail: handle Railway ENV with quotes, allow omni.morneven.com + localhost for dev
+  app.use(cors({ origin: origins, credentials: true }));
   app.use(express.json({ limit: "2mb" }));
   app.use(express.urlencoded({ extended: true }));
   app.use(auth as any);
