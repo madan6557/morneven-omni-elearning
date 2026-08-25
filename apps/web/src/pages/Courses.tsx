@@ -9,9 +9,9 @@ export default function Courses(){
       <h1 className="text-xl font-bold">Matkul</h1>
       <div className="grid md:grid-cols-2 gap-4">
         {list.map(c=>(
-          <Link key={c.id} to={`/courses/${c.id}`} className="bg-white border rounded-2xl p-5">
+          <Link key={c.id} to={`/courses/${c.id}`} className="bg-white dark:bg-zinc-800 border dark:border-zinc-700 rounded-2xl p-5">
             <div className="font-semibold">{c.title}</div>
-            <div className="text-sm text-zinc-500">{c.description}</div>
+            <div className="text-sm text-zinc-500 dark:text-zinc-400">{c.description}</div>
           </Link>
         ))}
       </div>

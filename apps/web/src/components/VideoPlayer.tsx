@@ -80,7 +80,7 @@ function YouTubePlayer({material, onProgress}:{material:any; onProgress?:any}){
       <div className="aspect-video bg-black rounded-xl overflow-hidden">
         <div id={containerId} className="w-full h-full" />
       </div>
-      <p className="text-xs text-zinc-500">YouTube — presisi via IFrame API {secs}s {secs?`(${Math.round(secs/(material.duration||600)*100)}%)`:""}</p>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">YouTube — presisi via IFrame API {secs}s {secs?`(${Math.round(secs/(material.duration||600)*100)}%)`:""}</p>
     </div>
   )
 }
@@ -99,7 +99,7 @@ function DrivePlayer({material, onProgress}:{material:any; onProgress?:any}){
       <div className="aspect-video bg-black rounded-xl overflow-hidden">
         <iframe src={src} className="w-full h-full" allow="autoplay" title={material.title} />
       </div>
-      <p className="text-xs text-zinc-500">Drive — estimasi waktu buka {secs}s</p>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">Drive — estimasi waktu buka {secs}s</p>
     </div>
   )
 }
@@ -135,7 +135,7 @@ function UploadPlayer({material, onProgress}:{material:any; onProgress?:any}){
           api.post("/api/progress/video",{ materialId: material.id, pos: Math.floor(v.duration), duration: Math.floor(v.duration)}).then(r=>onProgress?.(r.data.percent)).catch(()=>{});
         }}
       />
-      <p className="text-xs text-zinc-500">Upload — presisi + resume {Math.floor(lastSent.current)}s</p>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">Upload — presisi + resume {Math.floor(lastSent.current)}s</p>
     </div>
   )
 }

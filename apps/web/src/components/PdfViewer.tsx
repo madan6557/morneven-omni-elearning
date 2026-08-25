@@ -41,20 +41,20 @@ export default function PdfViewer({ material, onProgress }: { material: any, onP
       <div className="flex items-center justify-between">
         <div className="text-sm font-medium">Halaman {page} / {total} — {viewed.length} dilihat ({Math.round(percent)}%)</div>
         <div className="flex gap-2">
-          <button onClick={()=>go(page-1)} className="px-3 py-1.5 rounded bg-white border">Sebelumnya</button>
-          <button onClick={()=>go(page+1)} className="px-3 py-1.5 rounded bg-zinc-900 text-white">Selanjutnya</button>
+          <button onClick={()=>go(page-1)} className="px-3 py-1.5 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700">Sebelumnya</button>
+          <button onClick={()=>go(page+1)} className="px-3 py-1.5 rounded bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900">Selanjutnya</button>
         </div>
       </div>
       <div className="progress"><div style={{width:`${percent}%`}}/></div>
       <div className="flex gap-2 flex-wrap">
         {Array.from({length: total}, (_,i)=>i+1).map(n=>(
-          <button key={n} onClick={()=>go(n)} className={`w-9 h-9 rounded text-sm border ${viewed.includes(n)?"bg-green-600 text-white border-green-600": page===n?"bg-zinc-900 text-white":"bg-white"}`}>{n}</button>
+          <button key={n} onClick={()=>go(n)} className={`w-9 h-9 rounded text-sm border dark:border-zinc-700 ${viewed.includes(n)?"bg-green-600 dark:bg-green-700 text-white dark:text-zinc-900 border-green-600 dark:border-green-700": page===n?"bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900":"bg-white dark:bg-zinc-800"}`}>{n}</button>
         ))}
       </div>
-      <div className="bg-white rounded-xl border overflow-hidden" style={{height: 560}}>
+      <div className="bg-white dark:bg-zinc-800 rounded-xl border dark:border-zinc-700 overflow-hidden" style={{height: 560}}>
         <iframe src={isPPT ? src : `${src}#page=${page}`} className="w-full h-full" title={material.title} />
       </div>
-      <p className="text-xs text-zinc-500">{isPPT ? "PPT — per-slide tracking aktif (totalPages dari dosen), preview via Office Online. Klik halaman untuk progress." : "PDF — klik halaman / Next untuk mencatat progress (viewedPages JSON)."}</p>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">{isPPT ? "PPT — per-slide tracking aktif (totalPages dari dosen), preview via Office Online. Klik halaman untuk progress." : "PDF — klik halaman / Next untuk mencatat progress (viewedPages JSON)."}</p>
     </div>
   )
 }
