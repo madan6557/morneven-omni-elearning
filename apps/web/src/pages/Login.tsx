@@ -1,53 +1,53 @@
+import { ArrowRight, BookOpen, CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 
-export default function Login(){
-  const [nim,setNim]=useState("2025001");
-  const [pw,setPw]=useState("password123");
-  const [err,setErr]=useState("");
-  const nav=useNavigate();
-  const {login}=useAuth();
-  const submit=async(e:any)=>{
-    e.preventDefault(); setErr("");
-    try{
-      const r=await api.post("/api/auth/login",{nim, password:pw});
+export default function Login() {
+  const [nim, setNim] = useState("2025001");
+  const [pw, setPw] = useState("password123");
+  const [err, setErr] = useState("");
+  const nav = useNavigate();
+  const { login } = useAuth();
+
+  const submit = async (e: any) => {
+    e.preventDefault();
+    setErr("");
+    try {
+      const r = await api.post("/api/auth/login", { nim, password: pw });
       login(r.data.user, r.data.token);
       nav("/");
-    }catch(e:any){ setErr(e.response?.data?.message||"Gagal login"); }
+    } catch (e: any) {
+      setErr(e.response?.data?.message || "Gagal login");
+    }
   };
+
   return (
-    <div className="min-h-screen grid md:grid-cols-2">
-      <div className="hidden md:flex flex-col justify-center p-10 bg-gradient-to-br from-[#F88944] via-[#C47876] to-[#884892] text-white dark:text-zinc-900">
-        <img src="/omni-logo.svg" alt="OMNI" className="w-20 h-20 mb-6 bg-white dark:bg-zinc-800 rounded-2xl p-3"/>
-        <h1 className="text-4xl font-bold leading-tight">OMNI E-Learning</h1>
-        <p className="mt-3 text-white dark:text-zinc-900/90">Materi tersampaikan, progress terlacak. Video • PDF • PPT • Quiz pre/post test — 1 klik ke materi.</p>
-        <div className="mt-8 text-sm bg-white/15 rounded-xl p-4">
-          <div className="font-semibold">Akun demo (seed):</div>
-          <div>Admin: admin001 / password123</div>
-          <div>Dosen: 2024001 / password123</div>
-          <div>Mahasiswa: 2025001 / password123</div>
+    <div className="app-shell grid min-h-screen lg:grid-cols-[1.05fr_0.95fr]">
+      <section className="relative hidden overflow-hidden bg-zinc-950 px-10 py-12 text-white lg:flex lg:flex-col lg:justify-between xl:px-16">
+        <div className="absolute -right-28 -top-20 h-96 w-96 rounded-full bg-violet-600/40 blur-3xl" />
+        <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-orange-500/25 blur-3xl" />
+        <div className="relative"><div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#F88944] to-[#884892] p-1.5"><img src="/omni-logo.svg" alt="OMNI" className="h-full w-full rounded-lg bg-white/95 p-1" /></span><span className="text-sm font-bold tracking-[0.18em]">OMNI</span></div></div>
+        <div className="relative max-w-xl">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-xs font-semibold text-violet-100"><Sparkles size={14} /> The focused learning platform</div>
+          <h1 className="text-5xl font-bold leading-[1.08] tracking-tight xl:text-6xl">Belajar lebih tenang. Bertumbuh lebih konsisten.</h1>
+          <p className="mt-6 max-w-lg text-base leading-7 text-zinc-300">Materi tersampaikan, progress terlacak. Satu ruang untuk video, PDF, presentasi, dan evaluasi pembelajaran.</p>
+          <div className="mt-8 grid gap-3 text-sm text-zinc-200 sm:grid-cols-3"><span className="flex items-center gap-2"><CheckCircle2 size={16} className="text-orange-300" /> Materi terstruktur</span><span className="flex items-center gap-2"><CheckCircle2 size={16} className="text-orange-300" /> Progress terukur</span><span className="flex items-center gap-2"><CheckCircle2 size={16} className="text-orange-300" /> Evaluasi jelas</span></div>
         </div>
-      </div>
-      <div className="flex items-center justify-center p-6 bg-[#F8F7FC] dark:bg-zinc-900">
-        <form onSubmit={submit} className="w-full max-w-sm bg-white dark:bg-zinc-800 dark:border-zinc-700 rounded-2xl border dark:border-zinc-700 p-6 space-y-4">
-          <div className="flex items-center gap-3 md:hidden"><img src="/omni-logo.svg" className="w-9 h-9"/><span className="font-bold">OMNI</span></div>
-          <h2 className="text-xl font-bold">Masuk</h2>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Gunakan NIM sebagai username.</p>
-          <div>
-            <label className="text-sm">NIM / Username</label>
-            <input value={nim} onChange={e=>setNim(e.target.value)} className="mt-1 w-full border dark:border-zinc-700 rounded-lg px-3 py-2" placeholder="2025001"/>
-          </div>
-          <div>
-            <label className="text-sm">Password</label>
-            <input type="password" value={pw} onChange={e=>setPw(e.target.value)} className="mt-1 w-full border dark:border-zinc-700 rounded-lg px-3 py-2"/>
-          </div>
-          {err && <div className="text-sm text-red-600 bg-red-50 p-2 rounded">{err}</div>}
-          <button type="submit" className="w-full py-2.5 rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-medium">Masuk</button>
-          <div className="text-xs text-zinc-500 dark:text-zinc-400 text-center">Belum punya akun? Hubungi admin. <Link to="/login" className="underline">Demo seed otomatis</Link></div>
+        <p className="relative text-xs text-zinc-500">OMNI E-Learning · Ruang belajar yang lebih bermakna</p>
+      </section>
+
+      <section className="flex items-center justify-center px-5 py-10 sm:px-8">
+        <form onSubmit={submit} className="surface w-full max-w-md rounded-3xl p-6 sm:p-8">
+          <div className="mb-8 flex items-center gap-3 lg:hidden"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#F88944] to-[#884892] p-1.5"><img src="/omni-logo.svg" alt="OMNI" className="h-full w-full rounded-lg bg-white/95 p-1" /></span><span className="text-sm font-bold tracking-[0.18em]">OMNI</span></div>
+          <div className="mb-8"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-200"><BookOpen size={20} /></span><h2 className="mt-5 text-2xl font-bold tracking-tight">Selamat datang kembali</h2><p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">Masuk untuk melanjutkan perjalanan belajarmu.</p></div>
+          <div className="space-y-5"><div><label htmlFor="nim" className="text-xs font-bold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">NIM / Username</label><input id="nim" value={nim} onChange={(e) => setNim(e.target.value)} className="field mt-2" placeholder="2025001" autoComplete="username" /></div><div><label htmlFor="password" className="text-xs font-bold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">Password</label><input id="password" type="password" value={pw} onChange={(e) => setPw(e.target.value)} className="field mt-2" autoComplete="current-password" /></div></div>
+          {err && <div role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">{err}</div>}
+          <button type="submit" className="primary-button mt-6 w-full">Masuk ke workspace <ArrowRight size={17} /></button>
+          <div className="mt-6 flex items-start gap-2 border-t border-zinc-100 pt-5 text-xs leading-5 text-zinc-500 dark:border-zinc-800 dark:text-zinc-400"><ShieldCheck size={15} className="mt-0.5 shrink-0 text-emerald-500" /> Belum punya akun? Hubungi admin untuk mendapatkan akses.</div>
         </form>
-      </div>
+      </section>
     </div>
-  )
+  );
 }

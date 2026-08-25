@@ -1,45 +1,38 @@
 import { useEffect, useState } from "react";
+import { ChevronDown, Download, Users } from "lucide-react";
 import api from "../lib/api";
-export default function Rekap(){
-  const [courses,setCourses]=useState<any[]>([]);
-  const [sel,setSel]=useState<string>("");
-  const [data,setData]=useState<any>(null);
-  useEffect(()=>{ api.get("/api/courses").then(r=>{ setCourses(r.data); if(r.data[0]) setSel(r.data[0].id); }).catch(()=>{}); },[]);
-  useEffect(()=>{ if(sel) api.get(`/api/progress/rekap/${sel}`).then(r=>setData(r.data)).catch(()=>{}); },[sel]);
+
+export default function Rekap() {
+  const [courses, setCourses] = useState<any[]>([]);
+  const [sel, setSel] = useState<string>("");
+  const [data, setData] = useState<any>(null);
+
+  useEffect(() => { api.get("/api/courses").then((r) => { setCourses(r.data); if (r.data[0]) setSel(r.data[0].id); }).catch(() => {}); }, []);
+  useEffect(() => { if (sel) api.get(`/api/progress/rekap/${sel}`).then((r) => setData(r.data)).catch(() => {}); }, [sel]);
+
+  const exportCsv = () => {
+    if (!data) return;
+    const rows = data.rekap.map((r: any) => `${r.user.nim},${r.user.name},${r.overall}%,${r.downloads.length},${r.videos.length},${r.slides.length}`).join("\n");
+    const blob = new Blob(["NIM,Nama,Overall,Downloads,Video,Slide\n" + rows], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `rekap-${sel}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-bold">Rekap Progress Mahasiswa</h1>
-      <div className="flex gap-2">
-        <select value={sel} onChange={e=>setSel(e.target.value)} className="border dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800">
-          {courses.map(c=> <option key={c.id} value={c.id}>{c.title}</option>)}
-        </select>
-        {data && <button onClick={()=>{
-          const rows = data.rekap.map((r:any)=>`${r.user.nim},${r.user.name},${r.overall}%,${r.downloads.length},${r.videos.length},${r.slides.length}`).join("\n");
-          const blob=new Blob(["NIM,Nama,Overall,Downloads,Video,Slide\n"+rows],{type:"text/csv"});
-          const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=`rekap-${sel}.csv`; a.click();
-        }} className="px-4 py-2 rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-sm">Export CSV</button>}
+    <div className="mx-auto max-w-7xl space-y-8">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div><p className="eyebrow">Academic insights</p><h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">Rekap progress mahasiswa</h1><p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Pantau keterlibatan dan pencapaian belajar dalam satu ringkasan.</p></div>
+        <div className="flex h-11 w-fit items-center gap-2 rounded-xl bg-violet-100 px-3.5 text-sm font-semibold text-violet-700 dark:bg-violet-950/60 dark:text-violet-200"><Users size={17} /> {data?.rekap?.length || 0} mahasiswa</div>
       </div>
-      {data && (
-        <div className="bg-white dark:bg-zinc-800 border dark:border-zinc-700 rounded-2xl overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-zinc-50 dark:bg-zinc-800"><tr><th className="p-3 text-left">NIM</th><th className="p-3 text-left">Nama</th><th className="p-3">Overall</th><th className="p-3">Download</th><th className="p-3">Video</th><th className="p-3">Slide</th><th className="p-3">Quiz</th></tr></thead>
-            <tbody>
-              {data.rekap.map((r:any)=>(
-                <tr key={r.user.id} className="border-t dark:border-zinc-700">
-                  <td className="p-3">{r.user.nim}</td><td className="p-3">{r.user.name}</td>
-                  <td className="p-3 text-center">
-                    <div className="flex items-center gap-2 justify-center"><div className="w-24 shrink-0 progress"><div style={{width:`${r.overall}%`}}/></div><span className="text-xs w-10 text-left">{r.overall}%</span></div>
-                  </td>
-                  <td className="p-3 text-center">{r.downloads.length}</td>
-                  <td className="p-3 text-center">{r.videos.length} <span className="text-xs text-zinc-500 dark:text-zinc-400">({r.videos.map((v:any)=>Math.round(v.percent)+"%").join(", ")})</span></td>
-                  <td className="p-3 text-center">{r.slides.length}</td>
-                  <td className="p-3 text-center">{r.attempts.filter((a:any)=>a.passed).length}/{r.attempts.length}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <div className="section-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+        <div className="select-shell min-w-0 flex-1 sm:max-w-md"><select value={sel} onChange={(e) => setSel(e.target.value)} aria-label="Pilih mata kuliah untuk rekap" className="field select-field"><option value="" disabled>Pilih mata kuliah</option>{courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}</select><ChevronDown className="select-chevron" size={17} /></div>
+        {data && <button onClick={exportCsv} className="primary-button"><Download size={16} /> Export CSV</button>}
+      </div>
+      {data && <div className="table-shell overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead><tr><th>NIM</th><th>Nama</th><th className="text-center">Overall</th><th className="text-center">Download</th><th className="text-center">Video</th><th className="text-center">Slide</th><th className="text-center">Quiz</th></tr></thead><tbody>{data.rekap.map((r: any) => <tr key={r.user.id}><td className="font-medium">{r.user.nim}</td><td className="font-semibold">{r.user.name}</td><td><div className="flex items-center justify-center gap-3"><div className="progress w-24 shrink-0"><div style={{ width: `${r.overall}%` }} /></div><span className="w-10 text-left text-xs font-semibold">{r.overall}%</span></div></td><td className="text-center">{r.downloads.length}</td><td className="text-center">{r.videos.length}<span className="ml-1 text-xs text-zinc-400">({r.videos.map((v: any) => Math.round(v.percent) + "%").join(", ")})</span></td><td className="text-center">{r.slides.length}</td><td className="text-center">{r.attempts.filter((a: any) => a.passed).length}/{r.attempts.length}</td></tr>)}</tbody></table></div>}
     </div>
-  )
+  );
 }
