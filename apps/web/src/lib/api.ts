@@ -1,6 +1,7 @@
-import axios from "axios";
+﻿import axios from "axios";
 // @ts-ignore - vite types
-const api = axios.create({ baseURL: (import.meta as any).env?.VITE_API_URL || "" });
+const API_BASE_URL = ((import.meta as any).env?.VITE_API_URL || "").trim();
+const api = axios.create({ baseURL: API_BASE_URL });
 api.interceptors.request.use(cfg=>{
   const t = localStorage.getItem("token");
   if(t) cfg.headers.Authorization = `Bearer ${t}`;
