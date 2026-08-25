@@ -26,7 +26,7 @@ class RouteErrorBoundary extends Component<{ children: ReactNode }, { hasError: 
 
   render() {
     if (this.state.hasError) {
-      return <div className="section-card mx-auto max-w-xl text-center"><p className="eyebrow">Render error</p><h1 className="mt-2 text-xl font-bold">Konten belum dapat ditampilkan</h1><p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">Muat ulang halaman untuk mencoba kembali. Jika masalah berlanjut, periksa koneksi API dan console aplikasi.</p><button onClick={() => window.location.reload()} className="primary-button mt-5">Muat ulang halaman</button></div>;
+      return <div className="flex min-h-[60vh] items-center justify-center"><div className="section-card mx-auto w-full max-w-xl text-center"><p className="eyebrow">Render error</p><h1 className="mt-2 text-xl font-bold">Konten belum dapat ditampilkan</h1><p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">Muat ulang halaman untuk mencoba kembali. Jika masalah berlanjut, periksa koneksi API dan console aplikasi.</p><button onClick={() => window.location.reload()} className="primary-button mt-5">Muat ulang halaman</button></div></div>;
     }
     return this.props.children;
   }

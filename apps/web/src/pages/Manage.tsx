@@ -23,21 +23,35 @@ export default function Manage() {
   const [course, setCourse] = useState<any>(null);
   const [title, setTitle] = useState("");
   const [modTitle, setModTitle] = useState("");
+  const [error, setError] = useState("");
   const [mat, setMat] = useState({ moduleId: "", title: "", type: "VIDEO", sourceType: "youtube", sourceUrl: "", duration: "", totalPages: "12" });
   const [quiz, setQuiz] = useState({ moduleId: "", title: "", kind: "PRETEST", questions: [{ text: "", options: ["", "", "", ""], correctIndex: 0 }] as any[] });
 
   const load = async () => {
-    const r = await api.get("/api/courses");
-    setCourses(r.data);
-    if (r.data[0] && !sel) setSel(r.data[0].id);
+    try {
+      const r = await api.get("/api/courses");
+      const next = Array.isArray(r.data) ? r.data : [];
+      setCourses(next);
+      if (next[0] && !sel) setSel(next[0].id);
+      setError("");
+    } catch {
+      setError("Daftar mata kuliah belum dapat dimuat. Periksa koneksi API lalu muat ulang halaman.");
+    }
   };
 
   const loadCourse = async (id: string) => {
-    const r = await api.get(`/api/courses/${id}`);
-    setCourse(r.data);
-    if (r.data.modules[0]) {
-      setMat((m) => ({ ...m, moduleId: r.data.modules[0].id }));
-      setQuiz((q) => ({ ...q, moduleId: r.data.modules[0].id }));
+    try {
+      const r = await api.get(`/api/courses/${id}`);
+      const next = { ...r.data, modules: Array.isArray(r.data?.modules) ? r.data.modules : [] };
+      setCourse(next);
+      if (next.modules[0]) {
+        setMat((m) => ({ ...m, moduleId: next.modules[0].id }));
+        setQuiz((q) => ({ ...q, moduleId: next.modules[0].id }));
+      }
+      setError("");
+    } catch {
+      setCourse(null);
+      setError("Detail mata kuliah belum dapat dimuat. Pilih ulang mata kuliah atau muat ulang halaman.");
     }
   };
 
@@ -54,6 +68,7 @@ export default function Manage() {
         </div>
         <div className="hidden rounded-full bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 dark:bg-violet-950/50 dark:text-violet-200 sm:block">Admin workspace</div>
       </div>
+      {error && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">{error}</div>}
 
       <section className="section-card space-y-5">
         <div className="flex items-start gap-3">
