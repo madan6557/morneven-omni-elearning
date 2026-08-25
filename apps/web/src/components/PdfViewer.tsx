@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
 
-// ponytail: minimal PDF viewer — iframe for upload PDF + page buttons for tracking, not full pdfjs render
-export default function PdfViewer({ material }: { material: any }){
-  const total = material.totalPages || 12;
+// ponytail: minimal slide viewer — PDF & PPT per-slide tracking via viewedPages
+export default function PdfViewer({ material, onProgress }: { material: any, onProgress?: (p:number)=>void }){
+  const isPPT = material.type==="PPT";
+  const total = material.totalPages || (isPPT ? 10 : 12);
   const [page,setPage]=useState(1);
   const [viewed,setViewed]=useState<number[]>([]);
   const [percent,setPercent]=useState(0);
@@ -16,8 +17,8 @@ export default function PdfViewer({ material }: { material: any }){
       const s = r.data.slides?.find((x:any)=>x.materialId===material.id);
       if(s){
         try{
-          const v = Array.isArray(s.viewedPages) ? s.viewedPages : JSON.parse(s.viewedPages);
-          setViewed(v); setPercent(s.percent);
+          const v = typeof s.viewedPages==="string" ? JSON.parse(s.viewedPages) : s.viewedPages;
+          setViewed(v); setPercent(s.percent); onProgress?.(s.percent);
         }catch{}
       }
     }).catch(()=>{});
@@ -27,12 +28,13 @@ export default function PdfViewer({ material }: { material: any }){
     const np = Math.max(1, Math.min(total, p));
     setPage(np);
     api.post("/api/progress/slide",{ materialId: material.id, page: np }).then(r=>{
-      const v = Array.isArray(r.data.viewedPages) ? r.data.viewedPages : JSON.parse(r.data.viewedPages);
-      setViewed(v); setPercent(r.data.percent);
+      const v = typeof r.data.viewedPages==="string" ? JSON.parse(r.data.viewedPages) : r.data.viewedPages;
+      setViewed(v); setPercent(r.data.percent); onProgress?.(r.data.percent);
     }).catch(()=>{});
   };
 
-  const src = material.sourceUrl?.startsWith("/uploads/") ? material.sourceUrl : material.sourceUrl;
+  const rawSrc = material.sourceUrl?.startsWith("/uploads/") ? (window.location.origin + material.sourceUrl) : material.sourceUrl;
+  const src = isPPT && rawSrc?.startsWith("http") ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(rawSrc)}` : rawSrc;
 
   return (
     <div className="space-y-3">
@@ -50,10 +52,9 @@ export default function PdfViewer({ material }: { material: any }){
         ))}
       </div>
       <div className="bg-white rounded-xl border overflow-hidden" style={{height: 560}}>
-        {/* ponytail: iframe for PDF, native browser viewer */}
-        <iframe src={`${src}#page=${page}`} className="w-full h-full" title={material.title} />
+        <iframe src={isPPT ? src : `${src}#page=${page}`} className="w-full h-full" title={material.title} />
       </div>
-      <p className="text-xs text-zinc-500">PDF — klik halaman / Next untuk mencatat progress (viewedPages JSON). PPT hanya tracking download.</p>
+      <p className="text-xs text-zinc-500">{isPPT ? "PPT — per-slide tracking aktif (totalPages dari dosen), preview via Office Online. Klik halaman untuk progress." : "PDF — klik halaman / Next untuk mencatat progress (viewedPages JSON)."}</p>
     </div>
   )
 }

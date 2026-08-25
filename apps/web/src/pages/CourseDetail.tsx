@@ -45,9 +45,9 @@ export default function CourseDetail(){
               ))}
 
               {m.materials?.map((mat:any)=>{
-                const isVideo=mat.type==="VIDEO", isPdf=mat.type==="PDF", isPpt=mat.type==="PPT";
-                const pct = Number(isVideo ? (vMap.get(mat.id) as number ||0) : isPdf ? (sMap.get(mat.id) as number ||0) : dlSet.has(mat.id)?100:0);
-                const icon = isVideo?"▶": isPdf?"📄":"📦";
+                const isVideo=mat.type==="VIDEO", isSlide=mat.type==="PDF" || mat.type==="PPT";
+                const pct = Number(isVideo ? (vMap.get(mat.id) as number ||0) : isSlide ? (sMap.get(mat.id) as number || (dlSet.has(mat.id)?5:0)) : dlSet.has(mat.id)?100:0);
+                const icon = isVideo?"▶": mat.type==="PDF"?"📄":"📦";
                 return (
                   <Link key={mat.id} to={`/material/${mat.id}`} className="flex items-center gap-3 p-4 hover:bg-zinc-50">
                     <span className="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center">{icon}</span>

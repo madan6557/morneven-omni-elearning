@@ -29,7 +29,7 @@ r.post("/slide", requireAuth as any, async (req:any,res)=>{
   const { materialId, page } = parsed.data;
   const mat = await prisma.material.findUnique({ where:{id:materialId}});
   if(!mat) return res.status(404).json({message:"material not found"});
-  const total = mat.totalPages || 1;
+  const total = mat.totalPages || 10;
   const existing = await prisma.slideProgress.findUnique({ where:{ userId_materialId:{ userId:req.user.id, materialId }}});
   let viewed: number[] = [];
   if(existing?.viewedPages) {
@@ -37,7 +37,7 @@ r.post("/slide", requireAuth as any, async (req:any,res)=>{
   }
   if(!viewed.includes(page)) viewed.push(page);
   viewed = [...new Set(viewed)].sort((a,b)=>a-b);
-  const percent = (viewed.length/total)*100;
+  const percent = Math.min(100, (viewed.length/total)*100);
   const up = await prisma.slideProgress.upsert({
     where:{ userId_materialId:{ userId:req.user.id, materialId }},
     update:{ viewedPages: JSON.stringify(viewed), currentPage: page, percent },
@@ -79,15 +79,17 @@ r.get("/rekap/:courseId", requireAuth as any, async (req:any,res)=>{
     const videoMap = new Map(videos.map((v:any)=>[v.materialId, v.percent] as const));
     const slideMap = new Map(slides.map((s:any)=>[s.materialId, s.percent] as const));
     const downloadedSet = new Set(downloads.map((d:any)=>d.materialId));
-    // overall percent = avg of each material's best percent (video/slide/download)
+    // overall percent = avg of each material's best percent (video/slide/download) — PPT full per-slide tracking
     let sum=0;
     for(const mid of materialIds){
       const mat = course.modules.flatMap((m:any)=>m.materials).find((x:any)=>x.id===mid);
       if(!mat) continue;
       let p=0;
       if(mat.type==="VIDEO") p = (videoMap.get(mid) as number) ?? 0;
-      else if(mat.type==="PDF") p = (slideMap.get(mid) as number) ?? 0;
-      else if(mat.type==="PPT") p = downloadedSet.has(mid) ? 100 : 0;
+      else if(mat.type==="PDF" || mat.type==="PPT") {
+        const sp = (slideMap.get(mid) as number) ?? 0;
+        p = sp > 0 ? sp : (downloadedSet.has(mid) ? 5 : 0);
+      }
       sum+=p;
     }
     const overall = sum/totalMats;

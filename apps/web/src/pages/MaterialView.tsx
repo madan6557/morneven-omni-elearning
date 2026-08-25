@@ -49,19 +49,13 @@ export default function MaterialView(){
 
       <div className="bg-white border rounded-2xl p-4 md:p-6">
         {mat.type==="VIDEO" && <VideoPlayer material={mat} onProgress={setPct}/>}
-        {mat.type==="PDF" && <PdfViewer material={mat} />}
+        {(mat.type==="PDF" || mat.type==="PPT") && <PdfViewer material={mat} onProgress={setPct} />}
         {mat.type==="PPT" && (
-          <div className="space-y-4">
-            <div className="p-6 bg-zinc-50 border rounded-xl text-center">
-              <div className="text-4xl">📦</div>
-              <div className="font-medium mt-2">{mat.title}</div>
-              <div className="text-sm text-zinc-500">PPT — preview butuh convert, MVP tracking via download.</div>
-              <button onClick={handleDownload} className="mt-4 px-5 py-2.5 bg-zinc-900 text-white rounded-lg">⬇ Download PPT</button>
-            </div>
-            <a href={mat.sourceUrl} target="_blank" rel="noreferrer" className="text-sm text-primary underline">Buka sumber</a>
+          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+            PPT slide tracking aktif — klik halaman di atas. Download juga tercatat. Preview PPT via Office Online jika tersedia.
           </div>
         )}
-        { (mat.type==="PDF" || mat.type==="PPT") && mat.type!=="VIDEO" && (
+        {(mat.type==="PDF" || mat.type==="PPT") && (
           <div className="mt-4 flex gap-2">
             <button onClick={handleDownload} className="px-4 py-2 rounded-lg bg-white border text-sm">⬇ Download & Catat Progress</button>
             <a href={mat.sourceUrl} target="_blank" rel="noreferrer" className="px-4 py-2 rounded-lg bg-zinc-900 text-white text-sm">Buka File</a>

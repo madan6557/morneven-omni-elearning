@@ -9,27 +9,78 @@ export default function VideoPlayer({ material, onProgress }: { material: any; o
 }
 
 function YouTubePlayer({material, onProgress}:{material:any; onProgress?:any}){
-  const src = ytEmbed(material.sourceUrl);
+  const containerId = `yt-${material.id}`;
   const [secs,setSecs]=useState(0);
-  // ponytail: YT IFrame API not needed for MVP — track time on page while playing (est.)
+  const playerRef=useRef<any>(null);
+  const intervalRef=useRef<any>(null);
+  const lastSent=useRef(0);
+
   useEffect(()=>{
-    let t:any, active=true;
-    const iv=setInterval(()=>{
-      if(!active || document.hidden) return;
-      setSecs(s=>{const ns=s+5; // est 5s per tick if tab visible
-        api.post("/api/progress/video",{ materialId: material.id, pos: Math.min(ns, material.duration||600), duration: material.duration||600 }).catch(()=>{});
-        onProgress?.(Math.min(100, (ns/(material.duration||600))*100));
-        return ns;
+    const ytId = (()=>{ try{ const u=new URL(material.sourceUrl); if(u.hostname.includes("youtu.be")) return u.pathname.slice(1); return u.searchParams.get("v")||"";}catch{return ""}})();
+    if(!ytId) return;
+    let cancelled=false;
+
+    const initPlayer = () => {
+      if(cancelled) return;
+      const el=document.getElementById(containerId);
+      if(!el || !(window as any).YT?.Player) return;
+      // fetch lastPosition for resume
+      api.get(`/api/progress/course/${material.module?.courseId||"course-demo"}`).then(r=>{
+        const v=r.data.videos?.find((x:any)=>x.materialId===material.id);
+        if(v && v.lastPosition && playerRef.current?.seekTo){
+          try{ playerRef.current.seekTo(v.lastPosition, true); setSecs(v.lastPosition);}catch{}
+        }
+      }).catch(()=>{});
+
+      playerRef.current = new (window as any).YT.Player(containerId, {
+        videoId: ytId,
+        playerVars: { origin: window.location.origin, enablejsapi: 1 },
+        events: {
+          onStateChange: (e:any)=>{
+            const YTState=(window as any).YT.PlayerState;
+            if(e.data===YTState.PLAYING){
+              if(intervalRef.current) clearInterval(intervalRef.current);
+              intervalRef.current=setInterval(()=>{
+                const cur=playerRef.current?.getCurrentTime?.()||0;
+                const dur=playerRef.current?.getDuration?.()||material.duration||600;
+                if(cur - lastSent.current >= 5){
+                  lastSent.current=cur;
+                  setSecs(Math.floor(cur));
+                  api.post("/api/progress/video",{ materialId: material.id, pos: Math.floor(cur), duration: Math.floor(dur)}).then(r=>onProgress?.(r.data.percent)).catch(()=>{});
+                }
+              },5000);
+            } else {
+              if(intervalRef.current){ clearInterval(intervalRef.current); intervalRef.current=null; }
+              if(e.data===YTState.PAUSED || e.data===YTState.ENDED){
+                const cur=playerRef.current?.getCurrentTime?.()||0;
+                const dur=playerRef.current?.getDuration?.()||material.duration||600;
+                api.post("/api/progress/video",{ materialId: material.id, pos: Math.floor(cur), duration: Math.floor(dur)}).then(r=>onProgress?.(r.data.percent)).catch(()=>{});
+              }
+            }
+          }
+        }
       });
-    },5000);
-    return ()=>{ active=false; clearInterval(iv); clearInterval(t); };
+    };
+
+    if(!(window as any).YT){
+      const tag=document.createElement("script");
+      tag.src="https://www.youtube.com/iframe_api";
+      document.body.appendChild(tag);
+      (window as any).onYouTubeIframeAPIReady = initPlayer;
+      const check=setInterval(()=>{ if((window as any).YT?.Player){ clearInterval(check); initPlayer(); }},500);
+      return ()=>{ cancelled=true; clearInterval(check); if(intervalRef.current) clearInterval(intervalRef.current); };
+    } else {
+      initPlayer();
+    }
+    return ()=>{ cancelled=true; if(intervalRef.current) clearInterval(intervalRef.current); try{ playerRef.current?.destroy?.(); }catch{} };
   },[material.id]);
+
   return (
     <div className="space-y-2">
       <div className="aspect-video bg-black rounded-xl overflow-hidden">
-        <iframe src={src} className="w-full h-full" allow="autoplay; encrypted-media" allowFullScreen title={material.title} />
+        <div id={containerId} className="w-full h-full" />
       </div>
-      <p className="text-xs text-zinc-500">YouTube — progress estimasi {secs}s (ponytail: Drive/YT presisi penuh jika perlu IFrame API, add when dosen butuh detik akurat)</p>
+      <p className="text-xs text-zinc-500">YouTube — presisi via IFrame API {secs}s {secs?`(${Math.round(secs/(material.duration||600)*100)}%)`:""}</p>
     </div>
   )
 }
@@ -56,14 +107,14 @@ function UploadPlayer({material, onProgress}:{material:any; onProgress?:any}){
   const ref=useRef<HTMLVideoElement>(null);
   const lastSent=useRef(0);
   useEffect(()=>{
-    // resume
-    api.get(`/api/progress/course/${material.module?.courseId||""}`).catch(()=>{}); // warm
-    // load last position
-    const token=localStorage.getItem("token");
-    if(token){
-      fetch(`/api/progress/course/${material.module?.courseId||""}`,{headers:{Authorization:`Bearer ${token}`}}).catch(()=>{});
-    }
-  },[]);
+    // resume lastPosition
+    api.get(`/api/progress/course/${material.module?.courseId||"course-demo"}`).then(r=>{
+      const v=r.data.videos?.find((x:any)=>x.materialId===material.id);
+      if(v && v.lastPosition && ref.current){
+        try{ ref.current.currentTime = v.lastPosition; lastSent.current=v.lastPosition; onProgress?.(v.percent);}catch{}
+      }
+    }).catch(()=>{});
+  },[material.id]);
   return (
     <div className="space-y-2">
       <video
@@ -72,10 +123,6 @@ function UploadPlayer({material, onProgress}:{material:any; onProgress?:any}){
         preload="metadata"
         className="w-full aspect-video bg-black rounded-xl"
         src={material.sourceUrl}
-        onLoadedMetadata={(e)=>{
-          // try restore lastPosition via separate fetch
-          fetch(`/api/progress/course/demo`,{headers:{Authorization:`Bearer ${localStorage.getItem("token")}`}}).catch(()=>{});
-        }}
         onTimeUpdate={()=>{
           const v=ref.current; if(!v) return;
           if(v.currentTime - lastSent.current > 5){
@@ -85,10 +132,10 @@ function UploadPlayer({material, onProgress}:{material:any; onProgress?:any}){
         }}
         onEnded={()=>{
           const v=ref.current; if(!v) return;
-          api.post("/api/progress/video",{ materialId: material.id, pos: Math.floor(v.duration), duration: Math.floor(v.duration)}).catch(()=>{});
+          api.post("/api/progress/video",{ materialId: material.id, pos: Math.floor(v.duration), duration: Math.floor(v.duration)}).then(r=>onProgress?.(r.data.percent)).catch(()=>{});
         }}
       />
-      <p className="text-xs text-zinc-500">Upload — tracking native &lt;video&gt; timeupdate (presisi)</p>
+      <p className="text-xs text-zinc-500">Upload — presisi + resume {Math.floor(lastSent.current)}s</p>
     </div>
   )
 }

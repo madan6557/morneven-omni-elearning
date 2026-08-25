@@ -28,7 +28,7 @@ r.post("/upload", requireAuth as any, requireRole("ADMIN","DOSEN") as any, uploa
   const { moduleId, title, type } = req.body;
   if(!moduleId || !title || !type) return res.status(400).json({message:"moduleId, title, type required"});
   const sourceUrl = `/uploads/${req.file.filename}`;
-  const totalPages = type==="PDF" ? Number(req.body.totalPages||12) : undefined;
+  const totalPages = (type==="PDF" || type==="PPT") ? Number(req.body.totalPages|| (type==="PPT"?10:12)) : undefined;
   const m = await prisma.material.create({ data:{ moduleId, title, type, sourceType:"upload", sourceUrl, totalPages, duration: type==="VIDEO"? Number(req.body.duration||0): undefined } });
   res.status(201).json(m);
 });

@@ -95,7 +95,7 @@ async function main() {
   });
   await prisma.material.upsert({
     where: { id: "mat-ppt" },
-    update: {},
+    update: { totalPages: 10 },
     create: {
       id: "mat-ppt",
       moduleId: mod2.id,
@@ -103,6 +103,7 @@ async function main() {
       type: "PPT",
       sourceType: "upload",
       sourceUrl: "/uploads/layout.pptx",
+      totalPages: 10,
       order: 1,
     },
   });
