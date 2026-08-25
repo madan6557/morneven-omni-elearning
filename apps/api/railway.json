@@ -2,10 +2,10 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "nixpacks",
-    "buildCommand": "pnpm install && sed -i 's/provider = \"sqlite\"/provider = \"postgresql\"/' ../../packages/db/prisma/schema.prisma && npx prisma generate --schema=../../packages/db/prisma/schema.prisma && npx prisma migrate deploy --schema=../../packages/db/prisma/schema.prisma"
+    "buildCommand": "pnpm install && sed -i 's/provider = \"sqlite\"/provider = \"postgresql\"/' ../../packages/db/prisma/schema.prisma && npx prisma generate --schema=../../packages/db/prisma/schema.prisma"
   },
   "deploy": {
-    "startCommand": "pnpm start",
+    "startCommand": "npx prisma migrate deploy --schema=../../packages/db/prisma/schema.prisma && npx tsx ../../packages/db/prisma/seed.ts || true; pnpm start",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 100
   }
