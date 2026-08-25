@@ -58,7 +58,7 @@ export default function Layout({ children }: { children: any }) {
   };
 
   return (
-    <div className="app-shell min-h-screen text-zinc-900 dark:text-zinc-100">
+    <div className="app-shell flex min-h-screen text-zinc-900 dark:text-zinc-100">
       <aside className="sidebar-shell sticky top-0 hidden h-screen w-[264px] shrink-0 flex-col border-y-0 border-l-0 md:flex">
         <div className="flex items-center gap-3 border-b border-zinc-100 px-6 py-6 dark:border-zinc-800">
           <Link to="/" className="flex items-center gap-3" aria-label="OMNI dashboard">
