@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ArrowUpRight, BookOpen, CheckCircle, CirclePlay, Sparkles } from "lucide-react";
+﻿import { useEffect, useState } from "react";
+import { ArrowUpRight, BookOpen, CircleCheck, CirclePlay, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -27,7 +27,7 @@ export default function Dashboard() {
   const stats = [
     { label: "Matkul diikuti", value: courses.length, icon: BookOpen, tone: "violet" },
     { label: "Video ditonton", value: rekap?.videos?.length || 0, icon: CirclePlay, tone: "orange" },
-    { label: "Quiz selesai", value: rekap?.attempts?.length || 0, icon: CheckCircle, tone: "emerald" },
+    { label: "Quiz selesai", value: rekap?.attempts?.length || 0, icon: CircleCheck, tone: "emerald" },
   ];
 
   return (
