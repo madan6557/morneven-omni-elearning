@@ -1,4 +1,5 @@
-﻿import { Link, NavLink, useNavigate } from "react-router-dom";
+﻿import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import {
@@ -11,6 +12,25 @@ import {
   Sun,
   Users,
 } from "lucide-react";
+
+class RouteErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("Route render failed", error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <div className="section-card mx-auto max-w-xl text-center"><p className="eyebrow">Render error</p><h1 className="mt-2 text-xl font-bold">Konten belum dapat ditampilkan</h1><p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">Muat ulang halaman untuk mencoba kembali. Jika masalah berlanjut, periksa koneksi API dan console aplikasi.</p><button onClick={() => window.location.reload()} className="primary-button mt-5">Muat ulang halaman</button></div>;
+    }
+    return this.props.children;
+  }
+}
 
 export default function Layout({ children }: { children: any }) {
   const { user, logout } = useAuth();
@@ -136,7 +156,7 @@ export default function Layout({ children }: { children: any }) {
           ))}
         </nav>
 
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10">{children}</main>
+        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10"><RouteErrorBoundary>{children}</RouteErrorBoundary></main>
         <div className="px-4 pb-5 text-center text-[11px] text-zinc-400 sm:px-6 lg:px-10">OMNI E-Learning Â· Belajar lebih terarah, progres lebih terukur</div>
       </div>
     </div>
