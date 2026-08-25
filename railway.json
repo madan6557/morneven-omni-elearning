@@ -5,7 +5,7 @@
     "buildCommand": "pnpm install && sed -i 's/provider = \"sqlite\"/provider = \"postgresql\"/' packages/db/prisma/schema.prisma && pnpm --filter @repo/db exec prisma generate && pnpm --filter api build"
   },
   "deploy": {
-    "startCommand": "pnpm --filter @repo/db exec prisma migrate deploy && pnpm --filter @repo/db seed || true; pnpm --filter api start",
+    "startCommand": "sed -i 's/provider = \"sqlite\"/provider = \"postgresql\"/' packages/db/prisma/schema.prisma && pnpm --filter @repo/db exec prisma generate && pnpm --filter @repo/db exec prisma migrate deploy && pnpm --filter @repo/db seed || true; pnpm --filter api start",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 100
   }
