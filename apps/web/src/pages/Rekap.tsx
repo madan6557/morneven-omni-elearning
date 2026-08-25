@@ -28,7 +28,7 @@ export default function Rekap(){
                 <tr key={r.user.id} className="border-t dark:border-zinc-700">
                   <td className="p-3">{r.user.nim}</td><td className="p-3">{r.user.name}</td>
                   <td className="p-3 text-center">
-                    <div className="flex items-center gap-2 justify-center"><div className="w-24 progress"><div style={{width:`${r.overall}%`}}/></div><span className="text-xs">{r.overall}%</span></div>
+                    <div className="flex items-center gap-2 justify-center"><div className="w-24 shrink-0 progress"><div style={{width:`${r.overall}%`}}/></div><span className="text-xs w-10 text-left">{r.overall}%</span></div>
                   </td>
                   <td className="p-3 text-center">{r.downloads.length}</td>
                   <td className="p-3 text-center">{r.videos.length} <span className="text-xs text-zinc-500 dark:text-zinc-400">({r.videos.map((v:any)=>Math.round(v.percent)+"%").join(", ")})</span></td>
