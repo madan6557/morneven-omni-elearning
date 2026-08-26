@@ -115,7 +115,7 @@ export default function Layout({ children }: { children: any }) {
         <div className="m-4 rounded-2xl bg-gradient-to-br from-violet-50 to-orange-50 p-4 dark:from-violet-950/50 dark:to-orange-950/20">
           <p className="text-xs font-semibold text-violet-700 dark:text-violet-200">Akun aktif</p>
           <p className="mt-2 truncate text-sm font-semibold">{user.name}</p>
-          <p className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">{user.nim} Â· {user.role}</p>
+          <p className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">{user.nim} · {user.role}</p>
           <button onClick={handleLogout} className="secondary-button mt-4 min-h-9 w-full px-3 py-1.5 text-xs">
             <LogOut size={14} /> Keluar
           </button>
@@ -161,7 +161,7 @@ export default function Layout({ children }: { children: any }) {
         </nav>
 
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10"><RouteErrorBoundary>{children}</RouteErrorBoundary></main>
-        <div className="px-4 pb-5 text-center text-[11px] text-zinc-400 sm:px-6 lg:px-10">OMNI E-Learning Â· Belajar lebih terarah, progres lebih terukur</div>
+        <div className="px-4 pb-5 text-center text-[11px] text-zinc-400 sm:px-6 lg:px-10">OMNI E-Learning · Belajar lebih terarah, progres lebih terukur</div>
       </div>
     </div>
   );

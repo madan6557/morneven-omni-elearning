@@ -58,7 +58,7 @@ export default function Login() {
           <p className="mt-6 max-w-lg text-base leading-7 text-zinc-300">Materi tersampaikan, progress terlacak. Satu ruang untuk video, PDF, presentasi, dan evaluasi pembelajaran.</p>
           <div className="mt-8 grid gap-3 text-sm text-zinc-200 sm:grid-cols-3"><span className="flex items-center gap-2"><CircleCheck size={16} className="text-orange-300" /> Materi terstruktur</span><span className="flex items-center gap-2"><CircleCheck size={16} className="text-orange-300" /> Progress terukur</span><span className="flex items-center gap-2"><CircleCheck size={16} className="text-orange-300" /> Evaluasi jelas</span></div>
         </div>
-        <p className="relative text-xs text-zinc-500">OMNI E-Learning Â· Ruang belajar yang lebih bermakna</p>
+        <p className="relative text-xs text-zinc-500">OMNI E-Learning · Ruang belajar yang lebih bermakna</p>
       </section>
 
       <section className="flex items-center justify-center px-5 py-10 sm:px-8">

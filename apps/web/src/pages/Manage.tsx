@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, FileUp, Plus, Save } from "lucide-react";
+import { BookOpen, ChevronDown, CirclePlay, ClipboardCheck, FileUp, Plus, Save, Settings2 } from "lucide-react";
 import api from "../lib/api";
 import { useFeedback } from "../context/FeedbackContext";
 import { Spinner } from "../components/Loading";
@@ -77,7 +77,7 @@ export default function Manage() {
 
       <section className="section-card space-y-5">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-200"><BookOpenIcon /></div>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-200"><BookOpen size={19} /></div>
           <div><h2 className="font-semibold">Pilih mata kuliah</h2><p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Kelola struktur konten dari satu workspace.</p></div>
         </div>
         <SelectField value={sel} onChange={setSel} ariaLabel="Pilih mata kuliah" options={courses.map((c) => ({ value: c.id, label: c.title }))} />
@@ -91,7 +91,7 @@ export default function Manage() {
         <>
           <section className="section-card space-y-5">
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-200"><LayersIcon /></div>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-200"><Settings2 size={19} /></div>
               <div><p className="eyebrow">Course structure</p><h2 className="mt-1 font-semibold">Modul untuk {course.title}</h2><p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Susun materi ke dalam modul yang mudah dipindai.</p></div>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -105,7 +105,7 @@ export default function Manage() {
 
           <section className="section-card space-y-5">
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200"><VideoIcon /></div>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200"><CirclePlay size={19} /></div>
               <div><p className="eyebrow">Learning material</p><h2 className="mt-1 font-semibold">Tambah materi</h2><p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Gunakan label dan sumber yang konsisten agar mahasiswa tidak kehilangan konteks.</p></div>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
@@ -131,7 +131,7 @@ export default function Manage() {
 
           <section className="section-card space-y-5">
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-200"><QuizIcon /></div>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-200"><ClipboardCheck size={19} /></div>
               <div><p className="eyebrow">Assessment builder</p><h2 className="mt-1 font-semibold">Tambah quiz</h2><p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Buat evaluasi dengan opsi jawaban dan kunci yang jelas.</p></div>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
@@ -164,7 +164,3 @@ export default function Manage() {
   );
 }
 
-function BookOpenIcon() { return <span className="text-lg">◈</span>; }
-function LayersIcon() { return <span className="text-lg">▱</span>; }
-function VideoIcon() { return <span className="text-lg">▶</span>; }
-function QuizIcon() { return <span className="text-lg">?</span>; }
