@@ -28,6 +28,7 @@ export default function Manage() {
   const [sel, setSel] = useState("");
   const [course, setCourse] = useState<any>(null);
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [modTitle, setModTitle] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState<string | null>(null);
@@ -118,11 +119,14 @@ export default function Manage() {
           <div><h2 className="font-semibold">Pilih mata kuliah</h2><p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Kelola struktur konten dari satu workspace.</p></div>
         </div>
         <SelectField value={sel} onChange={setSel} ariaLabel="Pilih mata kuliah" options={courses.map((c) => ({ value: c.id, label: c.title }))} />
-        {course && <div className="flex flex-wrap gap-2"><button disabled={pending !== null} onClick={() => { setEditingCourseId(course.id); setTitle(course.title); }} className="secondary-button min-h-10 text-xs">Edit mata kuliah</button>{user?.role === "ADMIN" && <button disabled={pending !== null} onClick={() => remove(`Hapus mata kuliah ${course.title}? Semua modul, materi, dan quiz di dalamnya ikut terhapus.`, async () => { await api.delete(`/api/courses/${course.id}`); setCourse(null); setSel(""); setEditingCourseId(null); setTitle(""); await load(); })} className="inline-flex min-h-10 items-center justify-center rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-70 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-950/30">Hapus mata kuliah</button>}</div>}
-        <div className="flex flex-col gap-3 sm:flex-row">
+        {course && <div className="flex flex-wrap gap-2"><button disabled={pending !== null} onClick={() => { setEditingCourseId(course.id); setTitle(course.title); setDescription(course.description || ""); }} className="secondary-button min-h-10 text-xs">Edit mata kuliah</button>{user?.role === "ADMIN" && <button disabled={pending !== null} onClick={() => remove(`Hapus mata kuliah ${course.title}? Semua modul, materi, dan quiz di dalamnya ikut terhapus.`, async () => { await api.delete(`/api/courses/${course.id}`); setCourse(null); setSel(""); setEditingCourseId(null); setTitle(""); setDescription(""); await load(); })} className="inline-flex min-h-10 items-center justify-center rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-70 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-950/30">Hapus mata kuliah</button>}</div>}
+        <div className="space-y-3">
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={editingCourseId ? "Judul mata kuliah" : "Judul mata kuliah baru"} className={`${inputClass} flex-1`} />
-          <button disabled={pending !== null} onClick={async () => { setPending("course"); try { if (editingCourseId) { await api.put(`/api/courses/${editingCourseId}`, { title }); setEditingCourseId(null); showFeedback("Mata kuliah berhasil diperbarui."); } else { await api.post("/api/courses", { title, description: "" }); showFeedback("Mata kuliah berhasil ditambahkan."); } setTitle(""); await load(); if (sel) await loadCourse(editingCourseId || sel); } catch { showFeedback(editingCourseId ? "Mata kuliah gagal diperbarui." : "Mata kuliah gagal ditambahkan.", "error"); } finally { setPending(null); } }} className="primary-button sm:px-5 disabled:cursor-wait disabled:opacity-70">{pending === "course" ? <Spinner /> : editingCourseId ? <Save size={17} /> : <Plus size={17} />} {pending === "course" ? "Menyimpan..." : editingCourseId ? "Simpan perubahan" : "Tambah matkul"}</button>
-          {editingCourseId && <button onClick={() => { setEditingCourseId(null); setTitle(""); }} className="secondary-button">Batal</button>}
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Keterangan mata kuliah yang tampil di kartu, misalnya ringkasan materi atau tujuan pembelajaran" className={`${inputClass} min-h-24 w-full resize-y`} />
+          <div className="flex flex-wrap gap-3">
+            <button disabled={pending !== null} onClick={async () => { setPending("course"); try { if (editingCourseId) { await api.put(`/api/courses/${editingCourseId}`, { title, description }); setEditingCourseId(null); showFeedback("Mata kuliah berhasil diperbarui."); } else { await api.post("/api/courses", { title, description }); showFeedback("Mata kuliah berhasil ditambahkan."); } setTitle(""); setDescription(""); await load(); if (sel) await loadCourse(editingCourseId || sel); } catch { showFeedback(editingCourseId ? "Mata kuliah gagal diperbarui." : "Mata kuliah gagal ditambahkan.", "error"); } finally { setPending(null); } }} className="primary-button sm:px-5 disabled:cursor-wait disabled:opacity-70">{pending === "course" ? <Spinner /> : editingCourseId ? <Save size={17} /> : <Plus size={17} />} {pending === "course" ? "Menyimpan..." : editingCourseId ? "Simpan perubahan" : "Tambah matkul"}</button>
+          </div>
+          {editingCourseId && <button onClick={() => { setEditingCourseId(null); setTitle(""); setDescription(""); }} className="secondary-button">Batal</button>}
         </div>
       </section>
 
