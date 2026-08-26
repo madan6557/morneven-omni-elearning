@@ -4,13 +4,13 @@ import { requireAuth, requireRole } from "../middleware/auth.js";
 import { CreateQuizSchema, SubmitQuizSchema } from "@repo/shared";
 const r = Router();
 
-r.get("/", requireAuth as any, async (req,res)=>{
+r.get("/", requireAuth as any, async (req:any,res)=>{
   const { courseId, moduleId } = req.query as any;
   const where:any={};
   if(courseId) where.courseId=courseId;
   if(moduleId) where.moduleId=moduleId;
   const qs = await prisma.quiz.findMany({ where, include:{ questions:{ orderBy:{ order:"asc"}}, _count:{ select:{ questions:true } }}, orderBy:{ createdAt:"desc"}});
-  const parsed = qs.map((q:any)=>({ ...q, questions: q.questions.map((qq:any)=>({ ...qq, options: typeof qq.options==="string" ? JSON.parse(qq.options) : qq.options }))}));
+  const parsed = qs.map((q:any)=>({ ...q, questions: q.questions.map((qq:any)=>{ const item = { ...qq, options: typeof qq.options === "string" ? JSON.parse(qq.options) : qq.options }; if (req.user.role === "MAHASISWA") delete item.correctIndex; return item; })}));
   res.json(parsed);
 });
 

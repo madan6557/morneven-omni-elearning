@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BookOpen, ChevronDown, CirclePlay, ClipboardCheck, FileUp, Plus, Save, Settings2 } from "lucide-react";
+import { BookOpen, ChevronDown, CirclePlay, ClipboardCheck, FileUp, Plus, Save, Settings2, Users } from "lucide-react";
 import api from "../lib/api";
 import { useFeedback } from "../context/FeedbackContext";
 import { Spinner } from "../components/Loading";
@@ -37,6 +37,8 @@ export default function Manage() {
   const [editingQuizId, setEditingQuizId] = useState<string | null>(null);
   const [lecturers, setLecturers] = useState<any[]>([]);
   const [selectedLecturers, setSelectedLecturers] = useState<string[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [mat, setMat] = useState({ moduleId: "", title: "", type: "VIDEO", sourceType: "youtube", sourceUrl: "", duration: "", totalPages: "12" });
   const [quiz, setQuiz] = useState({ moduleId: "", title: "", kind: "PRETEST", showAnswers: false, questions: [{ text: "", options: ["", "", "", ""], correctIndex: 0 }] as any[] });
 
@@ -58,6 +60,10 @@ export default function Manage() {
       const next = { ...r.data, modules: Array.isArray(r.data?.modules) ? r.data.modules : [] };
       setCourse(next);
       setSelectedLecturers((next.instructors || []).map((item: any) => item.user?.id || item.userId || item.id));
+      try {
+        const enrollmentResponse = await api.get(`/api/courses/${id}/enrollments`);
+        setSelectedStudents((enrollmentResponse.data || []).map((item: any) => item.user?.id || item.userId));
+      } catch { setSelectedStudents([]); }
       if (next.modules[0]) {
         setMat((m) => ({ ...m, moduleId: next.modules[0].id }));
         setQuiz((q) => ({ ...q, moduleId: next.modules[0].id }));
@@ -70,7 +76,7 @@ export default function Manage() {
   };
 
   useEffect(() => { load(); }, []);
-  useEffect(() => { api.get("/api/auth/users").then((r) => setLecturers((r.data || []).filter((item: any) => item.role === "DOSEN"))).catch(() => {}); }, []);
+  useEffect(() => { api.get("/api/auth/users").then((r) => { const users = r.data || []; setLecturers(users.filter((item: any) => item.role === "DOSEN")); setStudents(users.filter((item: any) => item.role === "MAHASISWA")); }).catch(() => {}); }, []);
   useEffect(() => { if (sel) loadCourse(sel); }, [sel]);
 
   const resetMaterial = () => { setEditingMaterialId(null); setMat((m) => ({ ...m, title: "", sourceUrl: "", duration: "", totalPages: "" })); };
@@ -120,6 +126,12 @@ export default function Manage() {
               <div className="mt-3 grid gap-2 sm:grid-cols-2">{lecturers.map((lecturer) => <label key={lecturer.id} className="flex items-center gap-2 rounded-lg bg-white/70 px-3 py-2 text-sm dark:bg-zinc-900/60"><input type="checkbox" checked={selectedLecturers.includes(lecturer.id)} onChange={() => setSelectedLecturers((current) => current.includes(lecturer.id) ? current.filter((id) => id !== lecturer.id) : [...current, lecturer.id])} /> <span>{lecturer.name} <span className="text-xs text-zinc-500">({lecturer.nim})</span></span></label>)}</div>
               {lecturers.length === 0 && <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Belum ada akun dosen.</p>}
               <button disabled={pending !== null} onClick={async () => { setPending("instructors"); try { await api.put(`/api/courses/${course.id}/instructors`, { userIds: selectedLecturers }); await loadCourse(course.id); showFeedback("Dosen pengampu berhasil diperbarui."); } catch { showFeedback("Dosen pengampu gagal diperbarui.", "error"); } finally { setPending(null); } }} className="secondary-button mt-3 min-h-9 px-3 py-1.5 text-xs disabled:opacity-70">{pending === "instructors" ? <Spinner /> : <Save size={14} />} Simpan pengampu</button>
+            </div>
+            <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-4 dark:border-sky-900/50 dark:bg-sky-950/20">
+              <div className="flex items-start gap-3"><Users size={19} className="mt-0.5 text-sky-700 dark:text-sky-200" /><div><p className="text-sm font-semibold">Mahasiswa terdaftar</p><p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Pilih mahasiswa yang boleh mengakses mata kuliah ini. Daftar akan diganti sesuai pilihan saat disimpan.</p></div></div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">{students.map((student) => <label key={student.id} className="flex items-center gap-2 rounded-lg bg-white/70 px-3 py-2 text-sm dark:bg-zinc-900/60"><input type="checkbox" checked={selectedStudents.includes(student.id)} onChange={() => setSelectedStudents((current) => current.includes(student.id) ? current.filter((id) => id !== student.id) : [...current, student.id])} /> <span>{student.name} <span className="text-xs text-zinc-500">({student.nim})</span></span></label>)}</div>
+              {students.length === 0 && <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Belum ada akun mahasiswa.</p>}
+              <button disabled={pending !== null} onClick={async () => { setPending("students"); try { await api.put(`/api/courses/${course.id}/enrollments`, { userIds: selectedStudents }); await loadCourse(course.id); showFeedback("Daftar mahasiswa berhasil diperbarui."); } catch { showFeedback("Daftar mahasiswa gagal diperbarui.", "error"); } finally { setPending(null); } }} className="secondary-button mt-3 min-h-9 px-3 py-1.5 text-xs disabled:opacity-70">{pending === "students" ? <Spinner /> : <Save size={14} />} Simpan peserta</button>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <input value={modTitle} onChange={(e) => setModTitle(e.target.value)} placeholder={editingModuleId ? "Judul modul" : "Judul modul baru"} className={`${inputClass} flex-1`} />

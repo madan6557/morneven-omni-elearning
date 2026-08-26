@@ -3,6 +3,22 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 const r = Router();
 
+function hideAnswerKeys(course: any) {
+  return {
+    ...course,
+    modules: course.modules?.map((module: any) => ({
+      ...module,
+      quizzes: module.quizzes?.map((quiz: any) => ({
+        ...quiz,
+        questions: quiz.questions?.map((question: any) => {
+          const { correctIndex, ...safeQuestion } = question;
+          return safeQuestion;
+        })
+      }))
+    }))
+  };
+}
+
 // list courses — mahasiswa hanya yang enrolled, dosen/admin semua
 r.get("/", requireAuth as any, async (req: any, res) => {
   const { role, id } = req.user;
@@ -19,7 +35,7 @@ r.get("/", requireAuth as any, async (req: any, res) => {
     const count = await prisma.enrollment.count({ where: { courseId: c.id } });
     return { ...c, enrolledCount: count };
   }));
-  res.json(withCount);
+  res.json(role === "MAHASISWA" ? withCount.map(hideAnswerKeys) : withCount);
 });
 
 r.get("/:id", requireAuth as any, async (req: any, res) => {
@@ -28,7 +44,7 @@ r.get("/:id", requireAuth as any, async (req: any, res) => {
     include: { modules: { orderBy: { order: "asc" }, include: { materials: { orderBy: { order: "asc" } }, quizzes: { include: { questions: { orderBy: { order: "asc" } } } } } }, instructors: { include: { user: { select: { id: true, nim: true, name: true } } } } } as any
   });
   if (!c) return res.status(404).json({ message: "Not found" });
-  res.json(c);
+  res.json(req.user.role === "MAHASISWA" ? hideAnswerKeys(c) : c);
 });
 
 r.post("/", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
@@ -94,6 +110,16 @@ r.post("/:id/enroll", requireAuth as any, async (req: any, res) => {
 r.get("/:id/enrollments", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
   const en = await prisma.enrollment.findMany({ where: { courseId: req.params.id }, include: { user: { select: { id: true, nim: true, name: true, role: true } } } });
   res.json(en);
+});
+
+r.put("/:id/enrollments", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
+  const userIds = Array.isArray(req.body.userIds) ? req.body.userIds : [];
+  const students = await prisma.user.findMany({ where: { id: { in: userIds }, role: "MAHASISWA" }, select: { id: true } });
+  await prisma.$transaction([
+    prisma.enrollment.deleteMany({ where: { courseId: req.params.id } }),
+    ...students.map((student) => prisma.enrollment.create({ data: { courseId: req.params.id, userId: student.id } }))
+  ]);
+  res.json({ ok: true, userIds: students.map((student) => student.id) });
 });
 
 export default r;
