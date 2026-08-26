@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BookOpen, ChevronDown, CirclePlay, ClipboardCheck, FileUp, Plus, Save, Settings2, Users } from "lucide-react";
 import api from "../lib/api";
 import { useFeedback } from "../context/FeedbackContext";
@@ -22,7 +22,7 @@ function SelectField({ value, onChange, options, ariaLabel }: { value: string; o
 const inputClass = "field";
 
 export default function Manage() {
-  const { showFeedback, requestConfirmation } = useFeedback();
+  const { showFeedback, requestConfirmation, setUnsavedChanges } = useFeedback();
   const { user } = useAuth();
   const [courses, setCourses] = useState<any[]>([]);
   const [sel, setSel] = useState("");
@@ -39,6 +39,7 @@ export default function Manage() {
   const [selectedLecturers, setSelectedLecturers] = useState<string[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const savedAssignment = useRef({ lecturers: "", students: "" });
   const [mat, setMat] = useState({ moduleId: "", title: "", type: "VIDEO", sourceType: "youtube", sourceUrl: "", duration: "", totalPages: "12" });
   const [quiz, setQuiz] = useState({ moduleId: "", title: "", kind: "PRETEST", showAnswers: false, questions: [{ text: "", options: ["", "", "", ""], correctIndex: 0 }] as any[] });
 
@@ -63,6 +64,7 @@ export default function Manage() {
       try {
         const enrollmentResponse = await api.get(`/api/courses/${id}/enrollments`);
         setSelectedStudents((enrollmentResponse.data || []).map((item: any) => item.user?.id || item.userId));
+        savedAssignment.current = { lecturers: JSON.stringify((next.instructors || []).map((item: any) => item.user?.id || item.userId || item.id).sort()), students: JSON.stringify((enrollmentResponse.data || []).map((item: any) => item.user?.id || item.userId).sort()) };
       } catch { setSelectedStudents([]); }
       if (next.modules[0]) {
         setMat((m) => ({ ...m, moduleId: next.modules[0].id }));
@@ -78,6 +80,17 @@ export default function Manage() {
   useEffect(() => { load(); }, []);
   useEffect(() => { api.get("/api/auth/users").then((r) => { const users = r.data || []; setLecturers(users.filter((item: any) => item.role === "DOSEN")); setStudents(users.filter((item: any) => item.role === "MAHASISWA")); }).catch(() => {}); }, []);
   useEffect(() => { if (sel) loadCourse(sel); }, [sel]);
+  useEffect(() => {
+    const quizChanged = Boolean(quiz.title || quiz.questions.some((item: any) => item.text || item.options.some((option: string) => option)) || editingQuizId);
+    const materialChanged = Boolean(mat.title || mat.sourceUrl || mat.duration || mat.totalPages || editingMaterialId);
+    const courseChanged = Boolean(title || editingCourseId);
+    const moduleChanged = Boolean(modTitle || editingModuleId);
+    const lecturerChanged = course && JSON.stringify([...selectedLecturers].sort()) !== savedAssignment.current.lecturers;
+    const studentChanged = course && JSON.stringify([...selectedStudents].sort()) !== savedAssignment.current.students;
+    const message = quizChanged ? "data quiz" : materialChanged ? "data materi" : courseChanged ? "data mata kuliah" : moduleChanged ? "data modul" : lecturerChanged ? "dosen pengampu" : studentChanged ? "peserta mahasiswa" : null;
+    setUnsavedChanges(message ? `${message} belum disimpan.` : null);
+    return () => setUnsavedChanges(null);
+  }, [course, title, modTitle, mat, quiz, editingCourseId, editingModuleId, editingMaterialId, editingQuizId, selectedLecturers, selectedStudents, setUnsavedChanges]);
 
   const resetMaterial = () => { setEditingMaterialId(null); setMat((m) => ({ ...m, title: "", sourceUrl: "", duration: "", totalPages: "" })); };
   const resetQuiz = () => { setEditingQuizId(null); setQuiz((q) => ({ ...q, title: "", showAnswers: false, questions: [{ text: "", options: ["", "", "", ""], correctIndex: 0 }] })); };

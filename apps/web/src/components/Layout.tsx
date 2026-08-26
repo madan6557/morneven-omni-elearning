@@ -36,7 +36,7 @@ class RouteErrorBoundary extends Component<{ children: ReactNode }, { hasError: 
 export default function Layout({ children }: { children: any }) {
   const { user, logout } = useAuth();
   const { theme, toggle } = useTheme();
-  const { showFeedback, requestConfirmation } = useFeedback();
+  const { showFeedback, requestConfirmation, unsavedMessage, setUnsavedChanges } = useFeedback();
   const nav = useNavigate();
 
   if (!user) return <>{children}</>;
@@ -55,17 +55,27 @@ export default function Layout({ children }: { children: any }) {
 
   const visibleItems = navItems.filter((item) => item.show);
   const handleLogout = async () => {
+    if (unsavedMessage && !(await requestConfirmation(`Perubahan belum tersimpan: ${unsavedMessage} Jika keluar sekarang, perubahan tersebut akan hilang.`))) return;
     if (!(await requestConfirmation("Anda akan keluar dari workspace dan kembali ke halaman login."))) return;
+    setUnsavedChanges(null);
     logout();
     nav("/login");
     showFeedback("Anda telah keluar dari workspace.", "info");
+  };
+  const handleNavigation = async (event: import("react").MouseEvent, to: string) => {
+    if (!unsavedMessage) return;
+    event.preventDefault();
+    if (await requestConfirmation(`Perubahan belum tersimpan: ${unsavedMessage} Jika berpindah halaman sekarang, perubahan tersebut akan hilang.`)) {
+      setUnsavedChanges(null);
+      nav(to);
+    }
   };
 
   return (
     <div className="app-shell flex min-h-screen text-zinc-900 dark:text-zinc-100">
       <aside className="sidebar-shell sticky top-0 hidden h-screen w-[264px] shrink-0 flex-col border-y-0 border-l-0 md:flex">
         <div className="flex items-center gap-3 border-b border-zinc-100 px-6 py-6 dark:border-zinc-800">
-          <Link to="/" className="flex items-center gap-3" aria-label="OMNI dashboard">
+          <Link to="/" onClick={(event) => handleNavigation(event, "/")} className="flex items-center gap-3" aria-label="OMNI dashboard">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#F88944] to-[#884892] p-1.5 shadow-lg shadow-violet-500/20">
               <img src="/omni-logo.svg" alt="OMNI" className="h-full w-full rounded-lg bg-white/95 p-1" />
             </span>
@@ -93,6 +103,7 @@ export default function Layout({ children }: { children: any }) {
               key={to}
               to={to}
               end={end}
+              onClick={(event) => handleNavigation(event, to)}
               className={({ isActive }) =>
                 `group flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium transition-all ${
                   isActive
@@ -124,7 +135,7 @@ export default function Layout({ children }: { children: any }) {
 
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <header className="sidebar-shell sticky top-0 z-20 flex items-center justify-between border-x-0 border-t-0 px-4 py-3 md:hidden">
-          <Link to="/" className="flex items-center gap-2.5" aria-label="OMNI dashboard">
+          <Link to="/" onClick={(event) => handleNavigation(event, "/")} className="flex items-center gap-2.5" aria-label="OMNI dashboard">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#F88944] to-[#884892] p-1">
               <img src="/omni-logo.svg" alt="OMNI" className="h-full w-full rounded-md bg-white/95 p-0.5" />
             </span>
@@ -146,6 +157,7 @@ export default function Layout({ children }: { children: any }) {
               key={to}
               to={to}
               end={end}
+              onClick={(event) => handleNavigation(event, to)}
               className={({ isActive }) =>
                 `flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
                   isActive
