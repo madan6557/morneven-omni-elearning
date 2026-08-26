@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, FileUp, Plus, Save } from "lucide-react";
 import api from "../lib/api";
+import { useFeedback } from "../context/FeedbackContext";
 
 type SelectOption = { value: string; label: string };
 
@@ -18,6 +19,7 @@ function SelectField({ value, onChange, options, ariaLabel }: { value: string; o
 const inputClass = "field";
 
 export default function Manage() {
+  const { showFeedback } = useFeedback();
   const [courses, setCourses] = useState<any[]>([]);
   const [sel, setSel] = useState("");
   const [course, setCourse] = useState<any>(null);
@@ -78,7 +80,7 @@ export default function Manage() {
         <SelectField value={sel} onChange={setSel} ariaLabel="Pilih mata kuliah" options={courses.map((c) => ({ value: c.id, label: c.title }))} />
         <div className="flex flex-col gap-3 sm:flex-row">
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Judul mata kuliah baru" className={`${inputClass} flex-1`} />
-          <button onClick={async () => { await api.post("/api/courses", { title, description: "" }); setTitle(""); load(); }} className="primary-button sm:px-5"><Plus size={17} /> Tambah matkul</button>
+          <button onClick={async () => { try { await api.post("/api/courses", { title, description: "" }); setTitle(""); await load(); showFeedback("Mata kuliah berhasil ditambahkan."); } catch { showFeedback("Mata kuliah gagal ditambahkan.", "error"); } }} className="primary-button sm:px-5"><Plus size={17} /> Tambah matkul</button>
         </div>
       </section>
 
@@ -91,7 +93,7 @@ export default function Manage() {
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <input value={modTitle} onChange={(e) => setModTitle(e.target.value)} placeholder="Judul modul baru" className={`${inputClass} flex-1`} />
-              <button onClick={async () => { await api.post(`/api/courses/${course.id}/modules`, { title: modTitle, order: course.modules.length + 1 }); loadCourse(course.id); setModTitle(""); }} className="primary-button sm:px-5"><Plus size={17} /> Tambah modul</button>
+              <button onClick={async () => { try { await api.post(`/api/courses/${course.id}/modules`, { title: modTitle, order: course.modules.length + 1 }); setModTitle(""); await loadCourse(course.id); showFeedback("Modul berhasil ditambahkan."); } catch { showFeedback("Modul gagal ditambahkan.", "error"); } }} className="primary-button sm:px-5"><Plus size={17} /> Tambah modul</button>
             </div>
             <div className="flex flex-wrap gap-2 border-t border-zinc-100 pt-4 dark:border-zinc-800">
               {course.modules.map((m: any, index: number) => <span key={m.id} className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{String(index + 1).padStart(2, "0")} · {m.title}</span>)}
@@ -112,13 +114,13 @@ export default function Manage() {
               {mat.type === "VIDEO" && <input value={mat.duration} onChange={(e) => setMat({ ...mat, duration: e.target.value })} placeholder="Durasi dalam detik, misalnya 600" className={inputClass} />}
               {(mat.type === "PDF" || mat.type === "PPT") && <input value={mat.totalPages} onChange={(e) => setMat({ ...mat, totalPages: e.target.value })} placeholder={mat.type === "PPT" ? "Total slide presentasi" : "Total halaman"} className={inputClass} />}
             </div>
-            <button onClick={async () => { await api.post("/api/materials", { moduleId: mat.moduleId, title: mat.title, type: mat.type, sourceType: mat.sourceType, sourceUrl: mat.sourceUrl, duration: mat.duration ? Number(mat.duration) : undefined, totalPages: mat.totalPages ? Number(mat.totalPages) : undefined }); alert("Materi ditambah"); loadCourse(course.id); }} className="primary-button"><Save size={17} /> Simpan materi</button>
+            <button onClick={async () => { try { await api.post("/api/materials", { moduleId: mat.moduleId, title: mat.title, type: mat.type, sourceType: mat.sourceType, sourceUrl: mat.sourceUrl, duration: mat.duration ? Number(mat.duration) : undefined, totalPages: mat.totalPages ? Number(mat.totalPages) : undefined }); await loadCourse(course.id); showFeedback("Materi berhasil disimpan."); } catch { showFeedback("Materi gagal disimpan.", "error"); } }} className="primary-button"><Save size={17} /> Simpan materi</button>
             <div className="surface-muted rounded-xl p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div><p className="text-sm font-semibold">Upload file materi</p><p className="mt-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400">PDF, PPT, atau video untuk dipakai langsung di course.</p></div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <input type="file" id="fileup" className="block max-w-full text-xs text-zinc-500 file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-semibold file:text-zinc-700 dark:file:bg-zinc-900 dark:file:text-zinc-200" />
-                  <button onClick={async () => { const inp = document.getElementById("fileup") as HTMLInputElement; if (!inp.files?.[0]) return alert("Pilih file terlebih dahulu"); const fd = new FormData(); fd.append("file", inp.files[0]); fd.append("moduleId", mat.moduleId); fd.append("title", mat.title || inp.files[0].name); fd.append("type", mat.type); await api.post("/api/materials/upload", fd, { headers: { "Content-Type": "multipart/form-data" } }); alert("Uploaded"); loadCourse(course.id); }} className="secondary-button min-h-10 text-xs"><FileUp size={15} /> Upload</button>
+                  <button onClick={async () => { const inp = document.getElementById("fileup") as HTMLInputElement; if (!inp.files?.[0]) return showFeedback("Pilih file terlebih dahulu.", "info"); if (!window.confirm("Upload file ini ke mata kuliah?")) return; try { const fd = new FormData(); fd.append("file", inp.files[0]); fd.append("moduleId", mat.moduleId); fd.append("title", mat.title || inp.files[0].name); fd.append("type", mat.type); await api.post("/api/materials/upload", fd, { headers: { "Content-Type": "multipart/form-data" } }); await loadCourse(course.id); showFeedback("File berhasil di-upload."); } catch { showFeedback("Upload file gagal.", "error"); } }} className="secondary-button min-h-10 text-xs"><FileUp size={15} /> Upload</button>
                 </div>
               </div>
             </div>
@@ -150,7 +152,7 @@ export default function Manage() {
             ))}
             <div className="flex flex-col gap-3 sm:flex-row">
               <button onClick={() => setQuiz({ ...quiz, questions: [...quiz.questions, { text: "", options: ["", "", "", ""], correctIndex: 0 }] })} className="secondary-button"><Plus size={17} /> Tambah soal</button>
-              <button onClick={async () => { await api.post("/api/quizzes", { title: quiz.title, kind: quiz.kind, moduleId: quiz.moduleId, questions: quiz.questions.map((q: any, i: number) => ({ text: q.text, options: q.options, correctIndex: q.correctIndex, points: 10, order: i + 1 })) }); alert("Quiz dibuat"); }} className="primary-button"><Save size={17} /> Simpan quiz</button>
+              <button onClick={async () => { try { await api.post("/api/quizzes", { title: quiz.title, kind: quiz.kind, moduleId: quiz.moduleId, questions: quiz.questions.map((q: any, i: number) => ({ text: q.text, options: q.options, correctIndex: q.correctIndex, points: 10, order: i + 1 })) }); showFeedback("Quiz berhasil dibuat."); } catch { showFeedback("Quiz gagal dibuat.", "error"); } }} className="primary-button"><Save size={17} /> Simpan quiz</button>
             </div>
           </section>
         </>

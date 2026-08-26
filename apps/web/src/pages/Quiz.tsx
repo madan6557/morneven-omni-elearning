@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import api from "../lib/api";
+import { useFeedback } from "../context/FeedbackContext";
 
 export default function Quiz(){
   const {id}=useParams();
@@ -8,18 +9,22 @@ export default function Quiz(){
   const [answers,setAnswers]=useState<Record<string,number>>({});
   const [result,setResult]=useState<any>(null);
   const [attempts,setAttempts]=useState<any[]>([]);
+  const { showFeedback } = useFeedback();
   useEffect(()=>{
     api.get(`/api/quizzes/${id}`).then(r=>setQ(r.data)).catch(()=>{});
     api.get(`/api/quizzes/${id}/attempts`).then(r=>setAttempts(r.data)).catch(()=>{});
   },[id]);
   if(!q) return <div>Loading...</div>;
   const submit=async()=>{
-    const payload = { answers: q.questions.map((qq:any)=>({ questionId: qq.id, chosen: answers[qq.id] ?? -1 })) };
-    // start if needed
-    try{ await api.post(`/api/quizzes/${id}/start`); }catch{}
-    const r=await api.post(`/api/quizzes/${id}/submit`, payload);
-    setResult(r.data);
-    const at=await api.get(`/api/quizzes/${id}/attempts`); setAttempts(at.data);
+    if (!window.confirm("Kirim jawaban sekarang? Setelah dikirim, jawaban tidak dapat diubah.")) return;
+    try {
+      const payload = { answers: q.questions.map((qq:any)=>({ questionId: qq.id, chosen: answers[qq.id] ?? -1 })) };
+      try{ await api.post(`/api/quizzes/${id}/start`); }catch{}
+      const r=await api.post(`/api/quizzes/${id}/submit`, payload);
+      setResult(r.data);
+      const at=await api.get(`/api/quizzes/${id}/attempts`); setAttempts(at.data);
+      showFeedback("Jawaban berhasil dikirim.");
+    } catch { showFeedback("Jawaban gagal dikirim.", "error"); }
   };
   return (
     <div className="max-w-3xl mx-auto space-y-6">

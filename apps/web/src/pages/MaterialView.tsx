@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import VideoPlayer from "../components/VideoPlayer";
 import PdfViewer from "../components/PdfViewer";
+import { useFeedback } from "../context/FeedbackContext";
 
 export default function MaterialView(){
   const {id}=useParams();
@@ -10,6 +11,7 @@ export default function MaterialView(){
   const [course,setCourse]=useState<any>(null);
   const [pct,setPct]=useState(0);
   const nav=useNavigate();
+  const { showFeedback } = useFeedback();
   useEffect(()=>{
     api.get(`/api/materials/${id}`).then(async r=>{
       setMat(r.data);
@@ -35,7 +37,8 @@ export default function MaterialView(){
       window.open(`/api/materials/${mat.id}/download`, "_blank");
       // optimistic log via fetch with auth
       await api.get(`/api/materials/${mat.id}/download`).catch(()=>{});
-    }catch{}
+      showFeedback("Download berhasil dicatat.");
+    }catch{ showFeedback("Download gagal dicatat.", "error"); }
   };
 
   return (

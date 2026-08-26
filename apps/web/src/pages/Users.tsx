@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, UserPlus, Users as UsersIcon } from "lucide-react";
 import api from "../lib/api";
+import { useFeedback } from "../context/FeedbackContext";
 
 export default function Users() {
+  const { showFeedback } = useFeedback();
   const [list, setList] = useState<any[]>([]);
   const [form, setForm] = useState({ nim: "", name: "", password: "", role: "MAHASISWA" });
   const load = () => api.get("/api/auth/users").then((r) => setList(r.data)).catch(() => {});
@@ -19,7 +21,7 @@ export default function Users() {
           <input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Password" type="password" className="field" />
           <div className="select-shell"><select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} aria-label="Pilih role user" className="field select-field"><option>MAHASISWA</option><option>DOSEN</option><option>ADMIN</option></select><ChevronDown className="select-chevron" size={17} /></div>
         </div>
-        <button onClick={async () => { await api.post("/api/auth/users", form); setForm({ nim: "", name: "", password: "", role: "MAHASISWA" }); load(); }} className="primary-button"><UserPlus size={17} /> Tambah user</button>
+        <button onClick={async () => { if (!window.confirm(`Tambahkan user ${form.name || form.nim}?`)) return; try { await api.post("/api/auth/users", form); setForm({ nim: "", name: "", password: "", role: "MAHASISWA" }); await load(); showFeedback("User berhasil ditambahkan."); } catch { showFeedback("User gagal ditambahkan.", "error"); } }} className="primary-button"><UserPlus size={17} /> Tambah user</button>
       </section>
       <section className="table-shell overflow-x-auto">
         <div className="flex items-center gap-3 border-b border-zinc-100 px-5 py-4 dark:border-zinc-800"><UsersIcon size={18} className="text-violet-600" /><div><h2 className="text-sm font-semibold">Daftar pengguna</h2><p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{list.length} akun terdaftar</p></div></div>

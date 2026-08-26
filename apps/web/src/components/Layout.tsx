@@ -2,6 +2,7 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import { useFeedback } from "../context/FeedbackContext";
 import {
   ChartBar,
   BookOpen,
@@ -35,6 +36,7 @@ class RouteErrorBoundary extends Component<{ children: ReactNode }, { hasError: 
 export default function Layout({ children }: { children: any }) {
   const { user, logout } = useAuth();
   const { theme, toggle } = useTheme();
+  const { showFeedback } = useFeedback();
   const nav = useNavigate();
 
   if (!user) return <>{children}</>;
@@ -53,8 +55,10 @@ export default function Layout({ children }: { children: any }) {
 
   const visibleItems = navItems.filter((item) => item.show);
   const handleLogout = () => {
+    if (!window.confirm("Yakin ingin keluar dari workspace?")) return;
     logout();
     nav("/login");
+    showFeedback("Anda telah keluar dari workspace.", "info");
   };
 
   return (

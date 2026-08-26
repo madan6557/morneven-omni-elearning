@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { useFeedback } from "../context/FeedbackContext";
 
 const testAccounts = [{ id: "mahasiswa", label: "Mahasiswa · 2025001", nim: "2025001", password: "password123" }, { id: "dosen", label: "Dosen · 2024001", nim: "2024001", password: "password123" }, { id: "admin", label: "Admin · admin001", nim: "admin001", password: "password123" }];
 
@@ -13,6 +14,7 @@ export default function Login() {
   const [err, setErr] = useState("");
   const nav = useNavigate();
   const { login } = useAuth();
+  const { showFeedback } = useFeedback();
 
   const selectAccount = (id: string) => {
     const selected = testAccounts.find((item) => item.id === id);
@@ -29,9 +31,12 @@ export default function Login() {
     try {
       const r = await api.post("/api/auth/login", { nim, password: pw });
       login(r.data.user, r.data.token);
+      showFeedback("Login berhasil. Selamat datang kembali.");
       nav("/");
     } catch (e: any) {
-      setErr(e.response?.data?.message || "Gagal login");
+      const message = e.response?.data?.message || "Gagal login";
+      setErr(message);
+      showFeedback(message, "error");
     }
   };
 
