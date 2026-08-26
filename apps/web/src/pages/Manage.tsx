@@ -35,8 +35,10 @@ export default function Manage() {
   const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
   const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
   const [editingQuizId, setEditingQuizId] = useState<string | null>(null);
+  const [lecturers, setLecturers] = useState<any[]>([]);
+  const [selectedLecturers, setSelectedLecturers] = useState<string[]>([]);
   const [mat, setMat] = useState({ moduleId: "", title: "", type: "VIDEO", sourceType: "youtube", sourceUrl: "", duration: "", totalPages: "12" });
-  const [quiz, setQuiz] = useState({ moduleId: "", title: "", kind: "PRETEST", questions: [{ text: "", options: ["", "", "", ""], correctIndex: 0 }] as any[] });
+  const [quiz, setQuiz] = useState({ moduleId: "", title: "", kind: "PRETEST", showAnswers: false, questions: [{ text: "", options: ["", "", "", ""], correctIndex: 0 }] as any[] });
 
   const load = async () => {
     try {
@@ -55,6 +57,7 @@ export default function Manage() {
       const r = await api.get(`/api/courses/${id}`);
       const next = { ...r.data, modules: Array.isArray(r.data?.modules) ? r.data.modules : [] };
       setCourse(next);
+      setSelectedLecturers((next.instructors || []).map((item: any) => item.user?.id || item.userId || item.id));
       if (next.modules[0]) {
         setMat((m) => ({ ...m, moduleId: next.modules[0].id }));
         setQuiz((q) => ({ ...q, moduleId: next.modules[0].id }));
@@ -67,10 +70,11 @@ export default function Manage() {
   };
 
   useEffect(() => { load(); }, []);
+  useEffect(() => { api.get("/api/auth/users").then((r) => setLecturers((r.data || []).filter((item: any) => item.role === "DOSEN"))).catch(() => {}); }, []);
   useEffect(() => { if (sel) loadCourse(sel); }, [sel]);
 
   const resetMaterial = () => { setEditingMaterialId(null); setMat((m) => ({ ...m, title: "", sourceUrl: "", duration: "", totalPages: "" })); };
-  const resetQuiz = () => { setEditingQuizId(null); setQuiz((q) => ({ ...q, title: "", questions: [{ text: "", options: ["", "", "", ""], correctIndex: 0 }] })); };
+  const resetQuiz = () => { setEditingQuizId(null); setQuiz((q) => ({ ...q, title: "", showAnswers: false, questions: [{ text: "", options: ["", "", "", ""], correctIndex: 0 }] })); };
   const remove = async (message: string, action: () => Promise<void>) => {
     if (!(await requestConfirmation(message))) return;
     setPending("delete");
@@ -109,6 +113,13 @@ export default function Manage() {
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-200"><Settings2 size={19} /></div>
               <div><p className="eyebrow">Course structure</p><h2 className="mt-1 font-semibold">Modul untuk {course.title}</h2><p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Susun materi ke dalam modul yang mudah dipindai.</p></div>
+            </div>
+            <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-900/50 dark:bg-violet-950/20">
+              <p className="text-sm font-semibold">Dosen pengampu</p>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Pilih satu atau beberapa dosen yang mengampu mata kuliah ini.</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">{lecturers.map((lecturer) => <label key={lecturer.id} className="flex items-center gap-2 rounded-lg bg-white/70 px-3 py-2 text-sm dark:bg-zinc-900/60"><input type="checkbox" checked={selectedLecturers.includes(lecturer.id)} onChange={() => setSelectedLecturers((current) => current.includes(lecturer.id) ? current.filter((id) => id !== lecturer.id) : [...current, lecturer.id])} /> <span>{lecturer.name} <span className="text-xs text-zinc-500">({lecturer.nim})</span></span></label>)}</div>
+              {lecturers.length === 0 && <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Belum ada akun dosen.</p>}
+              <button disabled={pending !== null} onClick={async () => { setPending("instructors"); try { await api.put(`/api/courses/${course.id}/instructors`, { userIds: selectedLecturers }); await loadCourse(course.id); showFeedback("Dosen pengampu berhasil diperbarui."); } catch { showFeedback("Dosen pengampu gagal diperbarui.", "error"); } finally { setPending(null); } }} className="secondary-button mt-3 min-h-9 px-3 py-1.5 text-xs disabled:opacity-70">{pending === "instructors" ? <Spinner /> : <Save size={14} />} Simpan pengampu</button>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <input value={modTitle} onChange={(e) => setModTitle(e.target.value)} placeholder={editingModuleId ? "Judul modul" : "Judul modul baru"} className={`${inputClass} flex-1`} />
@@ -163,6 +174,7 @@ export default function Manage() {
               <SelectField value={quiz.moduleId} onChange={(value) => setQuiz({ ...quiz, moduleId: value })} ariaLabel="Pilih modul quiz" options={course.modules.map((m: any) => ({ value: m.id, label: m.title }))} />
               <SelectField value={quiz.kind} onChange={(value) => setQuiz({ ...quiz, kind: value })} ariaLabel="Pilih jenis quiz" options={[{ value: "PRETEST", label: "Pretest" }, { value: "POSTTEST", label: "Posttest" }, { value: "QUIZ", label: "Quiz" }]} />
               <input value={quiz.title} onChange={(e) => setQuiz({ ...quiz, title: e.target.value })} placeholder="Judul quiz" className={`${inputClass} md:col-span-2`} />
+              <label className="flex items-center gap-3 rounded-xl border border-zinc-200 px-3 py-3 text-sm dark:border-zinc-700 md:col-span-2"><input type="checkbox" checked={quiz.showAnswers} onChange={(e) => setQuiz({ ...quiz, showAnswers: e.target.checked })} /> Tampilkan kunci jawaban setelah quiz selesai <span className="text-xs text-zinc-500">(default nonaktif)</span></label>
             </div>
             {quiz.questions.map((qq: any, idx: number) => (
               <div key={idx} className="surface-muted space-y-4 rounded-2xl p-4">
@@ -181,13 +193,13 @@ export default function Manage() {
             <div className="border-t border-zinc-100 pt-4 dark:border-zinc-800">
               <p className="eyebrow">Existing quizzes</p>
               <div className="mt-3 space-y-2">
-                {course.modules.flatMap((m: any) => m.quizzes.map((item: any) => ({ ...item, moduleTitle: m.title }))).map((item: any) => <div key={item.id} className="flex flex-col gap-2 rounded-xl bg-zinc-50 px-3 py-3 text-sm dark:bg-zinc-800/70 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold">{item.title}</p><p className="text-xs text-zinc-500 dark:text-zinc-400">{item.moduleTitle} · {item.kind} · {item.questions.length} soal</p></div><div className="flex gap-2"><button onClick={() => { setEditingQuizId(item.id); setQuiz({ moduleId: item.moduleId, title: item.title, kind: item.kind, questions: item.questions.map((q: any) => ({ text: q.text, options: Array.isArray(q.options) ? q.options : JSON.parse(q.options), correctIndex: q.correctIndex })) }); }} className="secondary-button min-h-9 px-3 py-1.5 text-xs">Edit</button><button disabled={pending !== null} onClick={() => remove(`Hapus quiz ${item.title}? Riwayat pengerjaan quiz juga akan terhapus.`, async () => { await api.delete(`/api/quizzes/${item.id}`); if (editingQuizId === item.id) resetQuiz(); await loadCourse(course.id); })} className="inline-flex min-h-9 items-center rounded-xl border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 dark:border-red-900/60 dark:text-red-300">Hapus</button></div></div>)}
+                {course.modules.flatMap((m: any) => m.quizzes.map((item: any) => ({ ...item, moduleTitle: m.title }))).map((item: any) => <div key={item.id} className="flex flex-col gap-2 rounded-xl bg-zinc-50 px-3 py-3 text-sm dark:bg-zinc-800/70 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold">{item.title}</p><p className="text-xs text-zinc-500 dark:text-zinc-400">{item.moduleTitle} · {item.kind} · {item.questions.length} soal · Kunci {item.showAnswers ? "aktif" : "nonaktif"}</p></div><div className="flex gap-2"><button onClick={() => { setEditingQuizId(item.id); setQuiz({ moduleId: item.moduleId, title: item.title, kind: item.kind, showAnswers: item.showAnswers === true, questions: item.questions.map((q: any) => ({ text: q.text, options: Array.isArray(q.options) ? q.options : JSON.parse(q.options), correctIndex: q.correctIndex })) }); }} className="secondary-button min-h-9 px-3 py-1.5 text-xs">Edit</button><button disabled={pending !== null} onClick={() => remove(`Hapus quiz ${item.title}? Riwayat pengerjaan quiz juga akan terhapus.`, async () => { await api.delete(`/api/quizzes/${item.id}`); if (editingQuizId === item.id) resetQuiz(); await loadCourse(course.id); })} className="inline-flex min-h-9 items-center rounded-xl border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 dark:border-red-900/60 dark:text-red-300">Hapus</button></div></div>)}
                 {course.modules.every((m: any) => !m.quizzes.length) && <p className="text-sm text-zinc-500 dark:text-zinc-400">Belum ada quiz.</p>}
               </div>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <button onClick={() => setQuiz({ ...quiz, questions: [...quiz.questions, { text: "", options: ["", "", "", ""], correctIndex: 0 }] })} className="secondary-button"><Plus size={17} /> Tambah soal</button>
-              <button disabled={pending !== null} onClick={async () => { setPending("quiz"); try { const payload = { title: quiz.title, kind: quiz.kind, moduleId: quiz.moduleId, questions: quiz.questions.map((q: any, i: number) => ({ text: q.text, options: q.options, correctIndex: q.correctIndex, points: 10, order: i + 1 })) }; if (editingQuizId) { await api.put(`/api/quizzes/${editingQuizId}`, payload); showFeedback("Quiz berhasil diperbarui."); } else { await api.post("/api/quizzes", payload); showFeedback("Quiz berhasil dibuat."); } resetQuiz(); await loadCourse(course.id); } catch { showFeedback(editingQuizId ? "Quiz gagal diperbarui." : "Quiz gagal dibuat.", "error"); } finally { setPending(null); } }} className="primary-button disabled:cursor-wait disabled:opacity-70">{pending === "quiz" ? <Spinner /> : <Save size={17} />} {pending === "quiz" ? "Menyimpan..." : editingQuizId ? "Simpan perubahan" : "Simpan quiz"}</button>
+              <button disabled={pending !== null} onClick={async () => { setPending("quiz"); try { const payload = { title: quiz.title, kind: quiz.kind, moduleId: quiz.moduleId, showAnswers: quiz.showAnswers, questions: quiz.questions.map((q: any, i: number) => ({ text: q.text, options: q.options, correctIndex: q.correctIndex, points: 10, order: i + 1 })) }; if (editingQuizId) { await api.put(`/api/quizzes/${editingQuizId}`, payload); showFeedback("Quiz berhasil diperbarui."); } else { await api.post("/api/quizzes", payload); showFeedback("Quiz berhasil dibuat."); } resetQuiz(); await loadCourse(course.id); } catch { showFeedback(editingQuizId ? "Quiz gagal diperbarui." : "Quiz gagal dibuat.", "error"); } finally { setPending(null); } }} className="primary-button disabled:cursor-wait disabled:opacity-70">{pending === "quiz" ? <Spinner /> : <Save size={17} />} {pending === "quiz" ? "Menyimpan..." : editingQuizId ? "Simpan perubahan" : "Simpan quiz"}</button>
               {editingQuizId && <button onClick={resetQuiz} className="secondary-button">Batal</button>}
             </div>
           </section>

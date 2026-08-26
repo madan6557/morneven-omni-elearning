@@ -17,15 +17,15 @@ r.get("/", requireAuth as any, async (req,res)=>{
 r.get("/:id", requireAuth as any, async (req,res)=>{
   const q = await prisma.quiz.findUnique({ where:{id:req.params.id}, include:{ questions:{ orderBy:{ order:"asc"}}, module:true, course:true }});
   if(!q) return res.status(404).json({message:"Not found"});
-  const out = { ...q, questions: (q.questions as any[]).map((qq:any)=>({ ...qq, options: typeof qq.options==="string" ? JSON.parse(qq.options) : qq.options })) };
+  const out = { ...q, questions: (q.questions as any[]).map((qq:any) => { const item = { ...qq, options: typeof qq.options === "string" ? JSON.parse(qq.options) : qq.options }; if ((req as any).user?.role === "MAHASISWA") delete item.correctIndex; return item; }) };
   res.json(out);
 });
 
 r.post("/", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
   const parsed = CreateQuizSchema.safeParse(req.body);
   if(!parsed.success) return res.status(400).json(parsed.error);
-  const { title, kind, courseId, moduleId, passingScore, timeLimit, attemptLimit, questions } = parsed.data;
-  const quiz = await prisma.quiz.create({ data:{ title, kind: kind as any, courseId: courseId||null, moduleId: moduleId||null, passingScore, timeLimit: timeLimit ?? null, attemptLimit }});
+  const { title, kind, courseId, moduleId, passingScore, timeLimit, attemptLimit, showAnswers, questions } = parsed.data;
+  const quiz = await prisma.quiz.create({ data:{ title, kind: kind as any, courseId: courseId||null, moduleId: moduleId||null, passingScore, timeLimit: timeLimit ?? null, attemptLimit, showAnswers }});
   for(let i=0;i<questions.length;i++){
     const qq = questions[i];
     await prisma.question.create({ data:{ quizId: quiz.id, order: qq.order ?? i+1, text: qq.text, options: JSON.stringify(qq.options), correctIndex: qq.correctIndex, points: qq.points }});
@@ -90,7 +90,7 @@ r.post("/:id/submit", requireAuth as any, async (req:any,res)=>{
   } else {
     att = await prisma.quizAttempt.create({ data:{ userId:req.user.id, quizId:quiz.id, answers: JSON.stringify(parsed.data.answers), score: percent, passed, submittedAt: new Date() }});
   }
-  res.json({ ...att, maxScore:max, rawScore:score });
+  res.json({ ...att, maxScore:max, rawScore:score, answerKey: quiz.showAnswers ? Object.fromEntries(quiz.questions.map((q) => [q.id, q.correctIndex])) : undefined });
 });
 
 r.get("/:id/attempts", requireAuth as any, async (req:any,res)=>{

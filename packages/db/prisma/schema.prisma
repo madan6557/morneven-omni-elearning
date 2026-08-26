@@ -24,6 +24,7 @@ model User {
   videoProgress      VideoProgress[]
   slideProgress      SlideProgress[]
   quizAttempts       QuizAttempt[]
+  taughtCourses      CourseInstructor[]
 
   @@index([role])
 }
@@ -37,6 +38,17 @@ model Course {
   modules     Module[]
   enrollments Enrollment[]
   quizzes     Quiz[] // pretest per course
+  instructors CourseInstructor[]
+}
+
+model CourseInstructor {
+  courseId String
+  userId   String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([courseId, userId])
+  @@index([userId])
 }
 
 model Module {
@@ -136,6 +148,7 @@ model Quiz {
   passingScore Int      @default(60)
   timeLimit    Int? // minutes, null = no limit
   attemptLimit Int      @default(1)
+  showAnswers  Boolean  @default(false)
   createdAt    DateTime @default(now())
 
   questions Question[]

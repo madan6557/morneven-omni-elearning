@@ -32,6 +32,7 @@ export default function CourseDetail() {
           <p className="mt-8 text-xs font-bold uppercase tracking-[0.18em] text-violet-200">Course overview</p>
           <h1 className="mt-2 max-w-3xl text-3xl font-bold tracking-tight sm:text-4xl">{c.title}</h1>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-zinc-300">{c.description || "Ikuti rangkaian materi dan evaluasi untuk menyelesaikan course ini."}</p>
+          {c.instructors?.length > 0 && <p className="mt-4 text-sm text-zinc-300"><span className="font-semibold text-violet-200">Dosen pengampu:</span> {c.instructors.map((item: any) => item.user?.name || item.name).join(", ")}</p>}
           <div className="mt-7 flex flex-wrap gap-2 text-xs font-semibold text-zinc-300"><span className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5">{c.modules?.length || 0} modul</span><span className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5">{totalItems} aktivitas</span></div>
         </div>
       </section>

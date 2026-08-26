@@ -39,6 +39,11 @@ async function main() {
       description: "HTML, CSS, JS, dan progres belajar terlacak.",
     },
   });
+  await prisma.courseInstructor.upsert({
+    where: { courseId_userId: { courseId: course.id, userId: dosen.id } },
+    update: {},
+    create: { courseId: course.id, userId: dosen.id },
+  });
 
   const mod1 = await prisma.module.upsert({
     where: { id: "mod-1" },

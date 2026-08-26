@@ -10,9 +10,9 @@ r.get("/", requireAuth as any, async (req: any, res) => {
   if (role === "MAHASISWA") {
     const enrolls = await prisma.enrollment.findMany({ where: { userId: id }, select: { courseId: true } });
     const ids = enrolls.map((e:any) => e.courseId);
-    courses = await prisma.course.findMany({ where: { id: { "in": ids } }, include: { modules: { include: { materials: true, quizzes: true } } } as any, orderBy: { createdAt: "desc" } });
+    courses = await prisma.course.findMany({ where: { id: { "in": ids } }, include: { modules: { include: { materials: true, quizzes: true } }, instructors: { include: { user: { select: { id: true, nim: true, name: true } } } } } as any, orderBy: { createdAt: "desc" } });
   } else {
-    courses = await prisma.course.findMany({ include: { modules: { include: { materials: true, quizzes: true } } } as any, orderBy: { createdAt: "desc" } });
+    courses = await prisma.course.findMany({ include: { modules: { include: { materials: true, quizzes: true } }, instructors: { include: { user: { select: { id: true, nim: true, name: true } } } } } as any, orderBy: { createdAt: "desc" } });
   }
   // add enrollment count
   const withCount = await Promise.all(courses.map(async c => {
@@ -25,7 +25,7 @@ r.get("/", requireAuth as any, async (req: any, res) => {
 r.get("/:id", requireAuth as any, async (req: any, res) => {
   const c = await prisma.course.findUnique({
     where: { id: req.params.id },
-    include: { modules: { orderBy: { order: "asc" }, include: { materials: { orderBy: { order: "asc" } }, quizzes: { include: { questions: { orderBy: { order: "asc" } } } } } } } as any
+    include: { modules: { orderBy: { order: "asc" }, include: { materials: { orderBy: { order: "asc" } }, quizzes: { include: { questions: { orderBy: { order: "asc" } } } } } }, instructors: { include: { user: { select: { id: true, nim: true, name: true } } } } } as any
   });
   if (!c) return res.status(404).json({ message: "Not found" });
   res.json(c);
@@ -63,6 +63,22 @@ r.put("/modules/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, a
 r.delete("/modules/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
   await prisma.module.delete({ where: { id: req.params.id } });
   res.json({ ok: true });
+});
+
+// course instructors — one course may have multiple dosen
+r.get("/:id/instructors", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
+  const instructors = await prisma.courseInstructor.findMany({ where: { courseId: req.params.id }, include: { user: { select: { id: true, nim: true, name: true, role: true } } } });
+  res.json(instructors.map((item: any) => item.user));
+});
+
+r.put("/:id/instructors", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
+  const userIds = Array.isArray(req.body.userIds) ? req.body.userIds : [];
+  const users = await prisma.user.findMany({ where: { id: { in: userIds }, role: "DOSEN" }, select: { id: true } });
+  await prisma.$transaction([
+    prisma.courseInstructor.deleteMany({ where: { courseId: req.params.id } }),
+    ...users.map((user) => prisma.courseInstructor.create({ data: { courseId: req.params.id, userId: user.id } }))
+  ]);
+  res.json({ ok: true, userIds: users.map((user) => user.id) });
 });
 
 // enrollment

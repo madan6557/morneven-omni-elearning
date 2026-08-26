@@ -21,6 +21,7 @@ export const CreateQuizSchema = z.object({
   passingScore: z.number().min(0).max(100).default(60),
   timeLimit: z.number().nullable().optional(),
   attemptLimit: z.number().min(1).default(1),
+  showAnswers: z.boolean().default(false),
   questions: z.array(z.object({
     text: z.string().min(1),
     options: z.array(z.string()).min(2).max(6),
