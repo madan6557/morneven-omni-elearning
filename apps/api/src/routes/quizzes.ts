@@ -36,8 +36,20 @@ r.post("/", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,
 });
 
 r.put("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
-  const q = await prisma.quiz.update({ where:{id:req.params.id}, data: req.body });
-  res.json(q);
+  const { questions, ...quizData } = req.body;
+  const q = await prisma.$transaction(async (tx) => {
+    const updated = await tx.quiz.update({ where:{id:req.params.id}, data: quizData });
+    if (Array.isArray(questions)) {
+      await tx.question.deleteMany({ where: { quizId: req.params.id } });
+      for (let i = 0; i < questions.length; i++) {
+        const item = questions[i];
+        await tx.question.create({ data: { quizId: req.params.id, order: item.order ?? i + 1, text: item.text, options: JSON.stringify(item.options), correctIndex: item.correctIndex, points: item.points ?? 10 } });
+      }
+    }
+    return tx.quiz.findUnique({ where:{id:req.params.id}, include:{ questions:{ orderBy:{ order:"asc" } } } });
+  });
+  if (!q) return res.status(404).json({message:"Not found"});
+  res.json({ ...q, questions: q.questions.map((qq:any) => ({ ...qq, options: typeof qq.options === "string" ? JSON.parse(qq.options) : qq.options })) });
 });
 
 r.delete("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
