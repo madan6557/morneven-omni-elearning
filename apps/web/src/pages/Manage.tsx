@@ -41,7 +41,7 @@ export default function Manage() {
   const [students, setStudents] = useState<any[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const savedAssignment = useRef({ lecturers: "", students: "" });
-  const [mat, setMat] = useState({ moduleId: "", title: "", type: "VIDEO", sourceType: "youtube", sourceUrl: "", duration: "", totalPages: "12" });
+  const [mat, setMat] = useState({ moduleId: "", title: "", type: "VIDEO", sourceType: "youtube", sourceUrl: "", duration: "", totalPages: "" });
   const [quiz, setQuiz] = useState({ moduleId: "", title: "", kind: "PRETEST", showAnswers: false, questions: [{ text: "", options: ["", "", "", ""], correctIndex: 0 }] as any[] });
 
   const load = async () => {
