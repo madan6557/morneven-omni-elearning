@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useFeedback } from "../context/FeedbackContext";
+import { Spinner } from "../components/Loading";
 
 const testAccounts = [{ id: "mahasiswa", label: "Mahasiswa · 2025001", nim: "2025001", password: "password123" }, { id: "dosen", label: "Dosen · 2024001", nim: "2024001", password: "password123" }, { id: "admin", label: "Admin · admin001", nim: "admin001", password: "password123" }];
 
@@ -12,6 +13,7 @@ export default function Login() {
   const [nim, setNim] = useState("2025001");
   const [pw, setPw] = useState("password123");
   const [err, setErr] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const nav = useNavigate();
   const { login } = useAuth();
   const { showFeedback } = useFeedback();
@@ -27,7 +29,9 @@ export default function Login() {
 
   const submit = async (e: any) => {
     e.preventDefault();
+    if (submitting) return;
     setErr("");
+    setSubmitting(true);
     try {
       const r = await api.post("/api/auth/login", { nim, password: pw });
       login(r.data.user, r.data.token);
@@ -37,6 +41,8 @@ export default function Login() {
       const message = e.response?.data?.message || "Gagal login";
       setErr(message);
       showFeedback(message, "error");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -61,7 +67,7 @@ export default function Login() {
           <div className="mb-8"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-200"><BookOpen size={20} /></span><h2 className="mt-5 text-2xl font-bold tracking-tight">Selamat datang kembali</h2><p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">Masuk untuk melanjutkan perjalanan belajarmu.</p><div className="mt-5"><label htmlFor="test-account" className="text-xs font-bold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">Akun tes cepat</label><div className="select-shell mt-2"><select id="test-account" value={account} onChange={(e) => selectAccount(e.target.value)} className="field select-field">{testAccounts.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select><ChevronDown className="select-chevron" size={17} /></div><p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">Pilih akun untuk mengisi NIM dan password otomatis.</p></div></div>
           <div className="space-y-5"><div><label htmlFor="nim" className="text-xs font-bold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">NIM / Username</label><input id="nim" value={nim} onChange={(e) => setNim(e.target.value)} className="field mt-2" placeholder="2025001" autoComplete="username" /></div><div><label htmlFor="password" className="text-xs font-bold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">Password</label><input id="password" type="password" value={pw} onChange={(e) => setPw(e.target.value)} className="field mt-2" autoComplete="current-password" /></div></div>
           {err && <div role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">{err}</div>}
-          <button type="submit" className="primary-button mt-6 w-full">Masuk ke workspace <ArrowRight size={17} /></button>
+          <button type="submit" disabled={submitting} className="primary-button mt-6 w-full disabled:cursor-wait disabled:opacity-70">{submitting ? <Spinner /> : <ArrowRight size={17} />} {submitting ? "Memproses..." : "Masuk ke workspace"}</button>
           <div className="mt-6 flex items-start gap-2 border-t border-zinc-100 pt-5 text-xs leading-5 text-zinc-500 dark:border-zinc-800 dark:text-zinc-400"><ShieldCheck size={15} className="mt-0.5 shrink-0 text-emerald-500" /> Belum punya akun? Hubungi admin untuk mendapatkan akses.</div>
         </form>
       </section>

@@ -4,6 +4,7 @@ import api from "../lib/api";
 import VideoPlayer from "../components/VideoPlayer";
 import PdfViewer from "../components/PdfViewer";
 import { useFeedback } from "../context/FeedbackContext";
+import { Spinner } from "../components/Loading";
 
 export default function MaterialView(){
   const {id}=useParams();
@@ -12,6 +13,7 @@ export default function MaterialView(){
   const [pct,setPct]=useState(0);
   const nav=useNavigate();
   const { showFeedback } = useFeedback();
+  const [downloading, setDownloading] = useState(false);
   useEffect(()=>{
     api.get(`/api/materials/${id}`).then(async r=>{
       setMat(r.data);
@@ -32,6 +34,8 @@ export default function MaterialView(){
   }
 
   const handleDownload=async()=>{
+    if (downloading) return;
+    setDownloading(true);
     try{
       // hit tracking endpoint then open
       window.open(`/api/materials/${mat.id}/download`, "_blank");
@@ -39,6 +43,7 @@ export default function MaterialView(){
       await api.get(`/api/materials/${mat.id}/download`).catch(()=>{});
       showFeedback("Download berhasil dicatat.");
     }catch{ showFeedback("Download gagal dicatat.", "error"); }
+    finally { setDownloading(false); }
   };
 
   return (
@@ -60,7 +65,7 @@ export default function MaterialView(){
         )}
         {(mat.type==="PDF" || mat.type==="PPT") && (
           <div className="mt-4 flex gap-2">
-            <button onClick={handleDownload} className="px-4 py-2 rounded-lg bg-white dark:bg-zinc-800 border dark:border-zinc-700 text-sm">⬇ Download & Catat Progress</button>
+            <button disabled={downloading} onClick={handleDownload} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-zinc-800 border dark:border-zinc-700 text-sm disabled:cursor-wait disabled:opacity-70">{downloading ? <Spinner size={14} /> : "⬇"} {downloading ? "Mencatat..." : "Download & Catat Progress"}</button>
             <a href={mat.sourceUrl} target="_blank" rel="noreferrer" className="px-4 py-2 rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-sm">Buka File</a>
           </div>
         )}

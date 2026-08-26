@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import api from "../lib/api";
 import { useFeedback } from "../context/FeedbackContext";
+import { Spinner } from "../components/Loading";
 
 export default function Quiz(){
   const {id}=useParams();
@@ -10,6 +11,7 @@ export default function Quiz(){
   const [result,setResult]=useState<any>(null);
   const [attempts,setAttempts]=useState<any[]>([]);
   const { showFeedback } = useFeedback();
+  const [submitting,setSubmitting]=useState(false);
   useEffect(()=>{
     api.get(`/api/quizzes/${id}`).then(r=>setQ(r.data)).catch(()=>{});
     api.get(`/api/quizzes/${id}/attempts`).then(r=>setAttempts(r.data)).catch(()=>{});
@@ -17,6 +19,8 @@ export default function Quiz(){
   if(!q) return <div>Loading...</div>;
   const submit=async()=>{
     if (!window.confirm("Kirim jawaban sekarang? Setelah dikirim, jawaban tidak dapat diubah.")) return;
+    if (submitting) return;
+    setSubmitting(true);
     try {
       const payload = { answers: q.questions.map((qq:any)=>({ questionId: qq.id, chosen: answers[qq.id] ?? -1 })) };
       try{ await api.post(`/api/quizzes/${id}/start`); }catch{}
@@ -25,6 +29,7 @@ export default function Quiz(){
       const at=await api.get(`/api/quizzes/${id}/attempts`); setAttempts(at.data);
       showFeedback("Jawaban berhasil dikirim.");
     } catch { showFeedback("Jawaban gagal dikirim.", "error"); }
+    finally { setSubmitting(false); }
   };
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -59,7 +64,7 @@ export default function Quiz(){
         ))}
       </div>
 
-      <button onClick={submit} className="w-full py-3 rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-medium">Kirim Jawaban</button>
+      <button disabled={submitting} onClick={submit} className="inline-flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-medium disabled:cursor-wait disabled:opacity-70">{submitting && <Spinner />} {submitting ? "Mengirim..." : "Kirim Jawaban"}</button>
 
       {attempts.length>0 && (
         <div className="bg-white dark:bg-zinc-800 border dark:border-zinc-700 rounded-2xl p-5">
