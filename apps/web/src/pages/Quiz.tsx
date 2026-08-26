@@ -10,7 +10,7 @@ export default function Quiz(){
   const [answers,setAnswers]=useState<Record<string,number>>({});
   const [result,setResult]=useState<any>(null);
   const [attempts,setAttempts]=useState<any[]>([]);
-  const { showFeedback } = useFeedback();
+  const { showFeedback, requestConfirmation } = useFeedback();
   const [submitting,setSubmitting]=useState(false);
   useEffect(()=>{
     api.get(`/api/quizzes/${id}`).then(r=>setQ(r.data)).catch(()=>{});
@@ -18,7 +18,7 @@ export default function Quiz(){
   },[id]);
   if(!q) return <div>Loading...</div>;
   const submit=async()=>{
-    if (!window.confirm("Kirim jawaban sekarang? Setelah dikirim, jawaban tidak dapat diubah.")) return;
+    if (!(await requestConfirmation("Jawaban akan dikirim dan tidak dapat diubah setelah dikirim."))) return;
     if (submitting) return;
     setSubmitting(true);
     try {

@@ -21,7 +21,7 @@ function SelectField({ value, onChange, options, ariaLabel }: { value: string; o
 const inputClass = "field";
 
 export default function Manage() {
-  const { showFeedback } = useFeedback();
+  const { showFeedback, requestConfirmation } = useFeedback();
   const [courses, setCourses] = useState<any[]>([]);
   const [sel, setSel] = useState("");
   const [course, setCourse] = useState<any>(null);
@@ -123,7 +123,7 @@ export default function Manage() {
                 <div><p className="text-sm font-semibold">Upload file materi</p><p className="mt-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400">PDF, PPT, atau video untuk dipakai langsung di course.</p></div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <input type="file" id="fileup" aria-label="Pilih file materi untuk di-upload" title="Pilih file materi untuk di-upload" className="block max-w-full text-xs text-zinc-500 file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-semibold file:text-zinc-700 dark:file:bg-zinc-900 dark:file:text-zinc-200" />
-                  <button disabled={pending !== null} onClick={async () => { const inp = document.getElementById("fileup") as HTMLInputElement; if (!inp.files?.[0]) return showFeedback("Pilih file terlebih dahulu.", "info"); if (!window.confirm("Upload file ini ke mata kuliah?")) return; setPending("upload"); try { const fd = new FormData(); fd.append("file", inp.files[0]); fd.append("moduleId", mat.moduleId); fd.append("title", mat.title || inp.files[0].name); fd.append("type", mat.type); await api.post("/api/materials/upload", fd, { headers: { "Content-Type": "multipart/form-data" } }); inp.value = ""; setMat((m) => ({ ...m, title: "", sourceUrl: "", duration: "", totalPages: "" })); await loadCourse(course.id); showFeedback("File berhasil di-upload."); } catch { showFeedback("Upload file gagal.", "error"); } finally { setPending(null); } }} className="secondary-button min-h-10 text-xs disabled:cursor-wait disabled:opacity-70">{pending === "upload" ? <Spinner /> : <FileUp size={15} />} {pending === "upload" ? "Mengunggah..." : "Upload"}</button>
+                  <button disabled={pending !== null} onClick={async () => { const inp = document.getElementById("fileup") as HTMLInputElement; if (!inp.files?.[0]) return showFeedback("Pilih file terlebih dahulu.", "info"); if (!(await requestConfirmation("File akan disimpan ke mata kuliah yang dipilih."))) return; setPending("upload"); try { const fd = new FormData(); fd.append("file", inp.files[0]); fd.append("moduleId", mat.moduleId); fd.append("title", mat.title || inp.files[0].name); fd.append("type", mat.type); await api.post("/api/materials/upload", fd, { headers: { "Content-Type": "multipart/form-data" } }); inp.value = ""; setMat((m) => ({ ...m, title: "", sourceUrl: "", duration: "", totalPages: "" })); await loadCourse(course.id); showFeedback("File berhasil di-upload."); } catch { showFeedback("Upload file gagal.", "error"); } finally { setPending(null); } }} className="secondary-button min-h-10 text-xs disabled:cursor-wait disabled:opacity-70">{pending === "upload" ? <Spinner /> : <FileUp size={15} />} {pending === "upload" ? "Mengunggah..." : "Upload"}</button>
                 </div>
               </div>
             </div>

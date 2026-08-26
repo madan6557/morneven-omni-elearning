@@ -36,7 +36,7 @@ class RouteErrorBoundary extends Component<{ children: ReactNode }, { hasError: 
 export default function Layout({ children }: { children: any }) {
   const { user, logout } = useAuth();
   const { theme, toggle } = useTheme();
-  const { showFeedback } = useFeedback();
+  const { showFeedback, requestConfirmation } = useFeedback();
   const nav = useNavigate();
 
   if (!user) return <>{children}</>;
@@ -54,8 +54,8 @@ export default function Layout({ children }: { children: any }) {
   ];
 
   const visibleItems = navItems.filter((item) => item.show);
-  const handleLogout = () => {
-    if (!window.confirm("Yakin ingin keluar dari workspace?")) return;
+  const handleLogout = async () => {
+    if (!(await requestConfirmation("Anda akan keluar dari workspace dan kembali ke halaman login."))) return;
     logout();
     nav("/login");
     showFeedback("Anda telah keluar dari workspace.", "info");
