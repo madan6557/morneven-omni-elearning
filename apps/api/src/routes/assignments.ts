@@ -34,6 +34,7 @@ r.post("/", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (req
   if (!courseId || !moduleId || !title?.trim()) return res.status(400).json({ message: "courseId, moduleId, dan title wajib diisi." });
   const module = await prisma.module.findFirst({ where: { id: moduleId, courseId } });
   if (!module) return res.status(400).json({ message: "Modul tidak berada pada matkul ini." });
+  if (module.type === "UTS" || module.type === "UAS") return res.status(400).json({ message: "Modul UTS/UAS hanya dapat berisi quiz dan bank soal." });
   const [last, assignmentContent, materialContent, quizContent] = await Promise.all([prisma.assignment.findFirst({ where: { moduleId }, orderBy: { order: "desc" } }), prisma.assignment.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } }), prisma.material.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } }), prisma.quiz.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } })]);
   const contentOrder = Math.max(assignmentContent?.contentOrder ?? 0, materialContent?.contentOrder ?? 0, quizContent?.contentOrder ?? 0) + 1;
   const item = await prisma.assignment.create({ data: { courseId, moduleId, order: (last?.order ?? 0) + 1, contentOrder, title: title.trim(), description: description || null, availableFrom: availableFrom ? new Date(availableFrom) : null, deadline: deadline ? new Date(deadline) : null } });
@@ -46,6 +47,7 @@ r.put("/:id", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (r
   const { moduleId, title, description, availableFrom, deadline, archived } = req.body;
   if (!moduleId) return res.status(400).json({ message: "Tugas wajib berada di dalam modul." });
   const module = await prisma.module.findFirst({ where: { id: moduleId, courseId: existing.courseId } }); if (!module) return res.status(400).json({ message: "Modul tidak berada pada matkul ini." });
+  if (module.type === "UTS" || module.type === "UAS") return res.status(400).json({ message: "Modul UTS/UAS hanya dapat berisi quiz dan bank soal." });
   res.json(await prisma.assignment.update({ where: { id: req.params.id }, data: { moduleId, title: title?.trim(), description: description || null, availableFrom: availableFrom ? new Date(availableFrom) : null, deadline: deadline ? new Date(deadline) : null, ...(typeof archived === "boolean" ? { archived } : {}) } }));
 });
 

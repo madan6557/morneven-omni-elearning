@@ -29,6 +29,8 @@ const upload = multer({ storage, limits:{ fileSize: 500*1024*1024 } });
 
 // create material
 r.post("/", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
+  const moduleCheck = await prisma.module.findUnique({ where: { id: req.body.moduleId }, select: { type: true } });
+  if (moduleCheck?.type === "UTS" || moduleCheck?.type === "UAS") return res.status(400).json({ message: "Modul UTS/UAS hanya dapat berisi quiz dan bank soal." });
   const parsed = CreateMaterialSchema.safeParse(req.body);
   if(!parsed.success) return res.status(400).json(parsed.error);
   const last = await prisma.material.findFirst({ where: { moduleId: parsed.data.moduleId }, orderBy: { order: "desc" } });
@@ -42,6 +44,8 @@ r.post("/upload", requireAuth as any, requireRole("ADMIN","DOSEN") as any, uploa
   if(!req.file) return res.status(400).json({message:"file required"});
   const { moduleId, title, type } = req.body;
   if(!moduleId || !title || !type) return res.status(400).json({message:"moduleId, title, type required"});
+  const moduleCheck = await prisma.module.findUnique({ where: { id: moduleId }, select: { type: true } });
+  if (moduleCheck?.type === "UTS" || moduleCheck?.type === "UAS") return res.status(400).json({ message: "Modul UTS/UAS hanya dapat berisi quiz dan bank soal." });
   const sourceUrl = `/uploads/${req.file.filename}`;
   const totalPages = (type==="PDF" || type==="PPT") ? Number(req.body.totalPages|| (type==="PPT"?10:12)) : undefined;
   const last = await prisma.material.findFirst({ where: { moduleId }, orderBy: { order: "desc" } });
@@ -65,6 +69,8 @@ r.get("/:id", requireAuth as any, async (req,res)=>{
 r.put("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
   const existing = await prisma.material.findUnique({ where:{id:req.params.id} });
   if (!existing) return res.status(404).json({message:"Materi tidak ditemukan."});
+  const targetModule = await prisma.module.findUnique({ where: { id: req.body.moduleId }, select: { type: true } });
+  if (targetModule?.type === "UTS" || targetModule?.type === "UAS") return res.status(400).json({ message: "Modul UTS/UAS hanya dapat berisi quiz dan bank soal." });
   const { moduleId, title, type, sourceType, sourceUrl, duration, totalPages, availableFrom, archived, requireCompletionForDownload } = req.body;
   const m = await prisma.material.update({ where:{id:req.params.id}, data: { moduleId, title, type, sourceType, sourceUrl, availableFrom: availableFrom ? new Date(availableFrom) : null, duration: duration === "" ? null : duration, totalPages: totalPages === "" ? null : totalPages, ...(typeof archived === "boolean" ? { archived } : {}), ...(typeof requireCompletionForDownload === "boolean" ? { requireCompletionForDownload } : {}) } });
   if (req.body.sourceUrl && req.body.sourceUrl !== existing.sourceUrl) await removeMaterialFileIfUnused(existing.sourceUrl);

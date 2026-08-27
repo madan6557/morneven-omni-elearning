@@ -15,13 +15,18 @@ export type SlideProgressDTO = z.infer<typeof SlideProgressSchema>;
 // quiz
 export const CreateQuizSchema = z.object({
   title: z.string().min(3),
-  kind: z.enum(["QUIZ","PRETEST","POSTTEST","UTS","UAS"]).default("QUIZ"),
+  kind: z.enum(["QUIZ","PRETEST","POSTTEST"]).default("QUIZ"),
   courseId: z.string().optional(),
   moduleId: z.string().optional(),
   passingScore: z.number().min(0).max(100).default(60),
   timeLimit: z.number().nullable().optional(),
   attemptLimit: z.number().int().min(-1).default(1),
   showAnswers: z.boolean().default(false),
+  randomizeQuestions: z.boolean().default(false),
+  randomizeOptions: z.boolean().default(false),
+  questionCount: z.number().int().positive().nullable().optional(),
+  resultReleaseMode: z.enum(["HIDDEN", "MANUAL", "SCHEDULED"]).default("HIDDEN"),
+  resultReleaseAt: z.string().datetime().nullable().optional(),
   availableFrom: z.string().datetime().nullable().optional(),
   questions: z.array(z.object({
     type: z.enum(["MULTIPLE_CHOICE", "ESSAY"]).default("MULTIPLE_CHOICE"),
@@ -33,6 +38,8 @@ export const CreateQuizSchema = z.object({
     imageUrl: z.string().refine((value) => value.startsWith("/") || /^https?:\/\//i.test(value), "imageUrl must be an absolute or relative URL").nullable().optional(),
   }).superRefine((question, ctx) => { if (question.type === "MULTIPLE_CHOICE" && (question.options.length < 2 || question.correctIndex === null || question.correctIndex === undefined || question.correctIndex >= question.options.length)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Multiple choice wajib memiliki minimal 2 opsi dan jawaban benar." }); })).min(1)
 });
+
+export const ModuleTypeSchema = z.enum(["REGULAR", "UTS", "UAS"]);
 
 export const SubmitQuizSchema = z.object({
   answers: z.array(z.object({ questionId: z.string(), chosen: z.number().optional(), answerText: z.string().optional() }))

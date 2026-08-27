@@ -59,6 +59,7 @@ model Module {
   courseId  String
   course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   title     String
+  type      String   @default("REGULAR") // REGULAR | UTS | UAS
   order     Int      @default(0)
   createdAt DateTime @default(now())
 
@@ -152,11 +153,18 @@ model Quiz {
   moduleId     String?
   module       Module?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   title        String
-  kind         String   @default("QUIZ") // QUIZ | PRETEST | POSTTEST | UTS | UAS
+  kind         String   @default("QUIZ") // QUIZ | PRETEST | POSTTEST
   passingScore Int      @default(60)
   timeLimit    Int? // minutes, null = no limit
   attemptLimit Int      @default(1)
   showAnswers  Boolean  @default(false)
+  randomizeQuestions Boolean @default(false)
+  randomizeOptions Boolean @default(false)
+  questionCount Int?
+  resultReleaseMode String @default("HIDDEN") // HIDDEN | MANUAL | SCHEDULED
+  resultReleaseAt DateTime?
+  resultPublishedAt DateTime?
+  resultPublishedById String?
   deadline     DateTime?
   availableFrom DateTime?
   archived     Boolean  @default(false)
@@ -239,6 +247,7 @@ model QuizAttempt {
   passed      Boolean   @default(false)
   answers     String    @default("[]") // JSON stringify [{questionId, chosen}]
   startedAt   DateTime  @default(now())
+  expiresAt   DateTime?
   submittedAt DateTime?
   answerGrades QuizAnswerGrade[]
 

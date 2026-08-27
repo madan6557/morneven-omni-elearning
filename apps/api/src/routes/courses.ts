@@ -73,13 +73,15 @@ r.delete("/:id", requireAuth as any, requireRole("ADMIN") as any, async (req, re
 
 // modules
 r.post("/:courseId/modules", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
-  const { title, order } = req.body;
-  const m = await prisma.module.create({ data: { courseId: req.params.courseId, title, order: order ?? 0 } });
+  const { title, order, type = "REGULAR" } = req.body;
+  if (!title?.trim() || !["REGULAR", "UTS", "UAS"].includes(type)) return res.status(400).json({ message: "Judul dan tipe modul tidak valid." });
+  const m = await prisma.module.create({ data: { courseId: req.params.courseId, title: title.trim(), type, order: order ?? 0 } });
   res.status(201).json(m);
 });
 
 r.put("/modules/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
-  const m = await prisma.module.update({ where: { id: req.params.id }, data: req.body });
+  const data = { ...(req.body.title !== undefined ? { title: String(req.body.title).trim() } : {}), ...(req.body.type !== undefined && ["REGULAR", "UTS", "UAS"].includes(req.body.type) ? { type: req.body.type } : {}) };
+  const m = await prisma.module.update({ where: { id: req.params.id }, data });
   res.json(m);
 });
 
