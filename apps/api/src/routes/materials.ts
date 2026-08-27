@@ -32,7 +32,8 @@ r.post("/", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,
   const parsed = CreateMaterialSchema.safeParse(req.body);
   if(!parsed.success) return res.status(400).json(parsed.error);
   const last = await prisma.material.findFirst({ where: { moduleId: parsed.data.moduleId }, orderBy: { order: "desc" } });
-  const m = await prisma.material.create({ data: { ...parsed.data, order: (last?.order ?? 0) + 1 } });
+  const [assignmentContent, materialContent, quizContent] = await Promise.all([prisma.assignment.findFirst({ where: { moduleId: parsed.data.moduleId }, orderBy: { contentOrder: "desc" } }), prisma.material.findFirst({ where: { moduleId: parsed.data.moduleId }, orderBy: { contentOrder: "desc" } }), prisma.quiz.findFirst({ where: { moduleId: parsed.data.moduleId }, orderBy: { contentOrder: "desc" } })]);
+  const m = await prisma.material.create({ data: { ...parsed.data, order: (last?.order ?? 0) + 1, contentOrder: Math.max(assignmentContent?.contentOrder ?? 0, materialContent?.contentOrder ?? 0, quizContent?.contentOrder ?? 0) + 1 } });
   res.status(201).json(m);
 });
 
@@ -44,8 +45,9 @@ r.post("/upload", requireAuth as any, requireRole("ADMIN","DOSEN") as any, uploa
   const sourceUrl = `/uploads/${req.file.filename}`;
   const totalPages = (type==="PDF" || type==="PPT") ? Number(req.body.totalPages|| (type==="PPT"?10:12)) : undefined;
   const last = await prisma.material.findFirst({ where: { moduleId }, orderBy: { order: "desc" } });
+  const [assignmentContent, materialContent, quizContent] = await Promise.all([prisma.assignment.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } }), prisma.material.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } }), prisma.quiz.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } })]);
   try {
-    const m = await prisma.material.create({ data:{ moduleId, title, type, sourceType:"upload", sourceUrl, order: (last?.order ?? 0) + 1, totalPages, duration: type==="VIDEO"? Number(req.body.duration||0): undefined } });
+    const m = await prisma.material.create({ data:{ moduleId, title, type, sourceType:"upload", sourceUrl, order: (last?.order ?? 0) + 1, contentOrder: Math.max(assignmentContent?.contentOrder ?? 0, materialContent?.contentOrder ?? 0, quizContent?.contentOrder ?? 0) + 1, totalPages, duration: type==="VIDEO"? Number(req.body.duration||0): undefined } });
     res.status(201).json(m);
   } catch (error) {
     await removeMaterialFileIfUnused(sourceUrl);

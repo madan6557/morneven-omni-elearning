@@ -45,16 +45,7 @@ export default function CourseDetail() {
               <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-100 text-xs font-bold text-violet-700 dark:bg-violet-950/60 dark:text-violet-200">{String(moduleIndex + 1).padStart(2, "0")}</span><div><p className="text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-400">Module</p><h2 className="mt-0.5 font-semibold">{m.title}</h2></div></div>
               <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{m.materials.length} materi · {m.quizzes.length} quiz</span>
             </div>
-            <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {m.quizzes?.filter((q: any) => !q.archived && q.kind === "PRETEST").map((q: any) => <QuizRow key={q.id} q={q} done={quizDone.has(q.id)} />)}
-              {m.materials?.filter((item: any) => !item.archived).map((mat: any) => {
-                const isVideo = mat.type === "VIDEO";
-                const isSlide = mat.type === "PDF" || mat.type === "PPT";
-                const pct = Number(isVideo ? (vMap.get(mat.id) as number || 0) : isSlide ? (sMap.get(mat.id) as number || (dlSet.has(mat.id) ? 5 : 0)) : dlSet.has(mat.id) ? 100 : 0);
-                return <MaterialRow key={mat.id} mat={mat} pct={pct} downloaded={dlSet.has(mat.id)} isVideo={isVideo} />;
-              })}
-              {m.quizzes?.filter((q: any) => !q.archived && (q.kind === "POSTTEST" || q.kind === "QUIZ")).map((q: any) => <QuizRow key={q.id} q={q} done={quizDone.has(q.id)} />)}
-            </div>
+            <ModuleContent module={m} vMap={vMap} sMap={sMap} dlSet={dlSet} quizDone={quizDone} />
           </section>
         ))}
       </div>
@@ -63,6 +54,8 @@ export default function CourseDetail() {
     </div>
   );
 }
+
+function ModuleContent({ module, vMap, sMap, dlSet, quizDone }: any) { const items = [...(module.assignments || []).filter((item: any) => !item.archived).map((item: any) => ({ ...item, itemType: "assignment" })), ...(module.materials || []).filter((item: any) => !item.archived).map((item: any) => ({ ...item, itemType: "material" })), ...(module.quizzes || []).filter((item: any) => !item.archived).map((item: any) => ({ ...item, itemType: "quiz" }))].sort((a: any, b: any) => (a.contentOrder ?? 0) - (b.contentOrder ?? 0) || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()); return <div className="divide-y divide-zinc-100 dark:divide-zinc-800">{items.map((item: any) => { if (item.itemType === "quiz") return <QuizRow key={item.id} q={item} done={quizDone.has(item.id)} />; if (item.itemType === "assignment") return <div key={item.id} className="px-5 py-4 sm:px-6"><p className="text-sm font-semibold">{item.title}</p>{item.description && <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{item.description}</p>}<p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300">{item.deadline ? `Deadline: ${new Date(item.deadline).toLocaleString()}` : "Tanpa deadline"}</p></div>; const isVideo = item.type === "VIDEO"; const isSlide = item.type === "PDF" || item.type === "PPT"; const pct = Number(isVideo ? (vMap.get(item.id) as number || 0) : isSlide ? (sMap.get(item.id) as number || (dlSet.has(item.id) ? 5 : 0)) : dlSet.has(item.id) ? 100 : 0); return <MaterialRow key={item.id} mat={item} pct={pct} downloaded={dlSet.has(item.id)} isVideo={isVideo} />; })}</div>; }
 
 function QuizRow({ q, done }: { q: any; done: boolean }) {
   return <Link to={`/quiz/${q.id}`} className="group flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-violet-50/50 sm:px-6 dark:hover:bg-violet-950/20"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-200"><ClipboardCheck size={18} /></span><div className="min-w-0"><p className="truncate text-sm font-semibold">{q.title}</p><p className="mt-1 truncate text-xs text-zinc-500 dark:text-zinc-400">{q.kind === "PRETEST" ? "Pretest" : q.kind === "POSTTEST" ? "Posttest" : "Quiz"} · {q.questions.length} soal{q.passingScore ? ` · Lulus ${q.passingScore}%` : ""}{q.deadline ? ` · Deadline ${new Date(q.deadline).toLocaleString()}` : ""}</p></div></div><span className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${done ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"}`}>{done ? "Selesai" : "Kerjakan"}</span></Link>;

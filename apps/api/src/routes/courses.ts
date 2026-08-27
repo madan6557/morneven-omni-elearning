@@ -93,6 +93,38 @@ r.patch("/modules/:id/reorder", requireAuth as any, requireRole("ADMIN", "DOSEN"
   res.json(await prisma.module.findUnique({ where: { id: current.id } }));
 });
 
+r.patch("/modules/:moduleId/content/reorder", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (req: any, res) => {
+  const { itemType, itemId, direction } = req.body;
+  if (!["assignment", "material", "quiz"].includes(itemType) || !["up", "down"].includes(direction) || !itemId) return res.status(400).json({ message: "itemType, itemId, dan direction tidak valid." });
+  const module = await prisma.module.findUnique({ where: { id: req.params.moduleId } });
+  if (!module) return res.status(404).json({ message: "Modul tidak ditemukan." });
+  const [assignments, materials, quizzes] = await Promise.all([
+    prisma.assignment.findMany({ where: { moduleId: module.id } }),
+    prisma.material.findMany({ where: { moduleId: module.id } }),
+    prisma.quiz.findMany({ where: { moduleId: module.id } })
+  ]);
+  const items = [
+    ...assignments.map((item) => ({ ...item, itemType: "assignment" as const })),
+    ...materials.map((item) => ({ ...item, itemType: "material" as const })),
+    ...quizzes.map((item) => ({ ...item, itemType: "quiz" as const }))
+  ].sort((a, b) => a.contentOrder - b.contentOrder || a.createdAt.getTime() - b.createdAt.getTime());
+  const index = items.findIndex((item) => item.id === itemId && item.itemType === itemType);
+  const targetIndex = index + (direction === "up" ? -1 : 1);
+  if (index < 0) return res.status(404).json({ message: "Konten tidak ditemukan pada modul ini." });
+  if (targetIndex < 0 || targetIndex >= items.length) return res.json({ ok: true });
+  const current = items[index]; const target = items[targetIndex]; const temporary = items.length + 1;
+  const update = (tx: any, type: string, id: string, contentOrder: number) => type === "assignment"
+    ? tx.assignment.update({ where: { id }, data: { contentOrder } })
+    : type === "material" ? tx.material.update({ where: { id }, data: { contentOrder } })
+      : tx.quiz.update({ where: { id }, data: { contentOrder } });
+  await prisma.$transaction(async (tx) => {
+    await update(tx, current.itemType, current.id, temporary);
+    await update(tx, target.itemType, target.id, current.contentOrder);
+    await update(tx, current.itemType, current.id, target.contentOrder);
+  });
+  res.json({ ok: true });
+});
+
 r.delete("/modules/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => { const module = await prisma.module.findUnique({ where: { id: req.params.id }, include: { materials: true, quizzes: { include: { questions: true } } } }); if (!module) return res.status(404).json({ message: "Modul tidak ditemukan." }); await prisma.module.delete({ where: { id: req.params.id } }); const files = [...module.materials.map((item) => ({ url: item.sourceUrl, kind: "material" as const })), ...module.quizzes.flatMap((quiz) => quiz.questions.map((question) => ({ url: question.imageUrl, kind: "question" as const })))]; await Promise.all(files.map((file) => removeLocalFileIfUnused(file.url, file.kind))); res.json({ ok: true }); });
 
 // course instructors — one course may have multiple dosen

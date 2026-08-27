@@ -25,6 +25,7 @@ model User {
   slideProgress      SlideProgress[]
   quizAttempts       QuizAttempt[]
   taughtCourses      CourseInstructor[]
+  assignmentSubmissions AssignmentSubmission[]
 
   @@index([role])
 }
@@ -80,6 +81,7 @@ model Material {
   totalPages Int? // for PDF
   archived   Boolean  @default(false)
   order      Int          @default(0)
+  contentOrder Int         @default(0)
   externalId String?      @unique
   createdAt  DateTime     @default(now())
 
@@ -155,6 +157,7 @@ model Quiz {
   deadline     DateTime?
   archived     Boolean  @default(false)
   order        Int      @default(0)
+  contentOrder Int      @default(0)
   createdAt    DateTime @default(now())
 
   questions Question[]
@@ -175,10 +178,33 @@ model Assignment {
   deadline    DateTime?
   archived    Boolean  @default(false)
   order       Int      @default(0)
+  contentOrder Int      @default(0)
   createdAt   DateTime @default(now())
+  submissions AssignmentSubmission[]
 
   @@index([courseId])
   @@index([moduleId])
+}
+
+model AssignmentSubmission {
+  id           String     @id @default(cuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  note         String?
+  fileUrl      String?
+  fileName     String?
+  score        Float?
+  feedback     String?
+  submittedAt  DateTime   @default(now())
+  gradedAt     DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([assignmentId, userId])
+  @@index([assignmentId])
+  @@index([userId])
 }
 
 model Question {
