@@ -11,7 +11,8 @@ const mediaUrl = (value: string) => value.startsWith("/") ? `${api.defaults.base
 const newQuestion = () => ({ type: "MULTIPLE_CHOICE", text: "", options: ["", ""], correctIndex: 0, imageUrl: "" });
 
 function SelectField({ value, onChange, options, ariaLabel }: { value: string; onChange: (value: string) => void; options: { value: string; label: string }[]; ariaLabel: string }) {
-  return <div className="select-shell"><select aria-label={ariaLabel} value={value} onChange={(e) => onChange(e.target.value)} className="field select-field"><option value="" disabled>{ariaLabel}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><ChevronDown className="select-chevron" size={17} /></div>;
+  const choices = ariaLabel === "Jenis evaluasi" ? [...options, { value: "UTS", label: "UTS" }, { value: "UAS", label: "UAS" }] : options;
+  return <div className="select-shell"><select aria-label={ariaLabel} value={value} onChange={(e) => onChange(e.target.value)} className="field select-field"><option value="" disabled>{ariaLabel}</option>{choices.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><ChevronDown className="select-chevron" size={17} /></div>;
 }
 
 function UserPicker({ role, users, selected, setSelected }: any) {

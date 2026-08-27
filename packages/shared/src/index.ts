@@ -15,7 +15,7 @@ export type SlideProgressDTO = z.infer<typeof SlideProgressSchema>;
 // quiz
 export const CreateQuizSchema = z.object({
   title: z.string().min(3),
-  kind: z.enum(["PRETEST","POSTTEST","QUIZ"]).default("QUIZ"),
+  kind: z.enum(["QUIZ","PRETEST","POSTTEST","UTS","UAS"]).default("QUIZ"),
   courseId: z.string().optional(),
   moduleId: z.string().optional(),
   passingScore: z.number().min(0).max(100).default(60),

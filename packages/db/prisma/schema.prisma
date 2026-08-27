@@ -152,7 +152,7 @@ model Quiz {
   moduleId     String?
   module       Module?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   title        String
-  kind         String   @default("QUIZ") // PRETEST | POSTTEST | QUIZ
+  kind         String   @default("QUIZ") // QUIZ | PRETEST | POSTTEST | UTS | UAS
   passingScore Int      @default(60)
   timeLimit    Int? // minutes, null = no limit
   attemptLimit Int      @default(1)
