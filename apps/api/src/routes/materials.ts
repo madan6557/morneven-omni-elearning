@@ -18,7 +18,8 @@ const upload = multer({ storage, limits:{ fileSize: 500*1024*1024 } });
 r.post("/", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
   const parsed = CreateMaterialSchema.safeParse(req.body);
   if(!parsed.success) return res.status(400).json(parsed.error);
-  const m = await prisma.material.create({ data: parsed.data });
+  const last = await prisma.material.findFirst({ where: { moduleId: parsed.data.moduleId }, orderBy: { order: "desc" } });
+  const m = await prisma.material.create({ data: { ...parsed.data, order: (last?.order ?? 0) + 1 } });
   res.status(201).json(m);
 });
 
@@ -29,13 +30,14 @@ r.post("/upload", requireAuth as any, requireRole("ADMIN","DOSEN") as any, uploa
   if(!moduleId || !title || !type) return res.status(400).json({message:"moduleId, title, type required"});
   const sourceUrl = `/uploads/${req.file.filename}`;
   const totalPages = (type==="PDF" || type==="PPT") ? Number(req.body.totalPages|| (type==="PPT"?10:12)) : undefined;
-  const m = await prisma.material.create({ data:{ moduleId, title, type, sourceType:"upload", sourceUrl, totalPages, duration: type==="VIDEO"? Number(req.body.duration||0): undefined } });
+  const last = await prisma.material.findFirst({ where: { moduleId }, orderBy: { order: "desc" } });
+  const m = await prisma.material.create({ data:{ moduleId, title, type, sourceType:"upload", sourceUrl, order: (last?.order ?? 0) + 1, totalPages, duration: type==="VIDEO"? Number(req.body.duration||0): undefined } });
   res.status(201).json(m);
 });
 
 r.get("/:id", requireAuth as any, async (req,res)=>{
   const m = await prisma.material.findUnique({ where:{id:req.params.id}, include:{ module:true }});
-  if(!m) return res.status(404).json({message:"Not found"});
+  if(!m || (m.archived && (req as any).user.role === "MAHASISWA")) return res.status(404).json({message:"Not found"});
   res.json(m);
 });
 
@@ -44,8 +46,15 @@ r.put("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (re
   res.json(m);
 });
 
+r.patch("/:id/reorder", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req:any,res)=>{
+  const current = await prisma.material.findUnique({ where:{id:req.params.id} }); if (!current) return res.status(404).json({message:"Materi tidak ditemukan."});
+  const items = await prisma.material.findMany({ where:{moduleId:current.moduleId}, orderBy:[{order:"asc"},{createdAt:"asc"}] }); const index=items.findIndex((item)=>item.id===current.id); const target=index+(req.body.direction==="up"?-1:1); if(target<0||target>=items.length) return res.json(current);
+  await prisma.$transaction(async(tx)=>{ await tx.material.update({where:{id:current.id},data:{order:-1}}); await tx.material.update({where:{id:items[target].id},data:{order:current.order}}); await tx.material.update({where:{id:current.id},data:{order:items[target].order}}); }); res.json(await prisma.material.findUnique({where:{id:current.id}}));
+});
+
 r.delete("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
-  await prisma.material.delete({ where:{id:req.params.id}});
+  const item=await prisma.material.findUnique({where:{id:req.params.id}}); await prisma.material.delete({ where:{id:req.params.id}});
+  if(item){const rest=await prisma.material.findMany({where:{moduleId:item.moduleId},orderBy:[{order:"asc"},{createdAt:"asc"}]}); await prisma.$transaction(rest.map((row,index)=>prisma.material.update({where:{id:row.id},data:{order:index+1}})));}
   res.json({ok:true});
 });
 

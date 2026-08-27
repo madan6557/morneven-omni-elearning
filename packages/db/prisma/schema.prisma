@@ -154,6 +154,7 @@ model Quiz {
   showAnswers  Boolean  @default(false)
   deadline     DateTime?
   archived     Boolean  @default(false)
+  order        Int      @default(0)
   createdAt    DateTime @default(now())
 
   questions Question[]
@@ -173,6 +174,7 @@ model Assignment {
   description String?
   deadline    DateTime?
   archived    Boolean  @default(false)
+  order       Int      @default(0)
   createdAt   DateTime @default(now())
 
   @@index([courseId])

@@ -41,7 +41,7 @@ r.get("/", requireAuth as any, async (req: any, res) => {
 r.get("/:id", requireAuth as any, async (req: any, res) => {
   const c = await prisma.course.findUnique({
     where: { id: req.params.id },
-    include: { assignments: { orderBy: { deadline: "asc" } }, modules: { orderBy: { order: "asc" }, include: { materials: { orderBy: { order: "asc" } }, quizzes: { include: { questions: { orderBy: { order: "asc" } } } }, assignments: { orderBy: { deadline: "asc" } } } }, instructors: { include: { user: { select: { id: true, nim: true, name: true } } } } } as any
+    include: { assignments: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] }, modules: { orderBy: { order: "asc" }, include: { materials: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] }, quizzes: { orderBy: [{ order: "asc" }, { createdAt: "asc" }], include: { questions: { orderBy: { order: "asc" } } } }, assignments: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] } } }, instructors: { include: { user: { select: { id: true, nim: true, name: true } } } } } as any
   });
   if (!c) return res.status(404).json({ message: "Not found" });
   res.json(req.user.role === "MAHASISWA" ? hideAnswerKeys(c) : c);
@@ -76,6 +76,16 @@ r.put("/modules/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, a
   res.json(m);
 });
 
+r.patch("/modules/:id/reorder", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (req: any, res) => {
+  const current = await prisma.module.findUnique({ where: { id: req.params.id } });
+  if (!current) return res.status(404).json({ message: "Modul tidak ditemukan." });
+  const items = await prisma.module.findMany({ where: { courseId: current.courseId }, orderBy: [{ order: "asc" }, { createdAt: "asc" }] });
+  const index = items.findIndex((item) => item.id === current.id); const target = index + (req.body.direction === "up" ? -1 : 1);
+  if (target < 0 || target >= items.length) return res.json(current);
+  await prisma.$transaction(async (tx) => { await tx.module.update({ where: { id: current.id }, data: { order: -1 } }); await tx.module.update({ where: { id: items[target].id }, data: { order: current.order } }); await tx.module.update({ where: { id: current.id }, data: { order: items[target].order } }); });
+  res.json(await prisma.module.findUnique({ where: { id: current.id } }));
+});
+
 r.delete("/modules/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
   await prisma.module.delete({ where: { id: req.params.id } });
   res.json({ ok: true });
@@ -87,7 +97,7 @@ r.get("/:id/instructors", requireAuth as any, requireRole("ADMIN","DOSEN") as an
   res.json(instructors.map((item: any) => item.user));
 });
 
-r.put("/:id/instructors", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
+r.put("/:id/instructors", requireAuth as any, requireRole("ADMIN") as any, async (req, res) => {
   const userIds = Array.isArray(req.body.userIds) ? req.body.userIds : [];
   const users = await prisma.user.findMany({ where: { id: { in: userIds }, role: "DOSEN" }, select: { id: true } });
   await prisma.$transaction([
