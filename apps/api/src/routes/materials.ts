@@ -62,7 +62,8 @@ r.get("/:id", requireAuth as any, async (req,res)=>{
 r.put("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
   const existing = await prisma.material.findUnique({ where:{id:req.params.id} });
   if (!existing) return res.status(404).json({message:"Materi tidak ditemukan."});
-  const m = await prisma.material.update({ where:{id:req.params.id}, data:req.body });
+  const { moduleId, title, type, sourceType, sourceUrl, duration, totalPages, archived } = req.body;
+  const m = await prisma.material.update({ where:{id:req.params.id}, data: { moduleId, title, type, sourceType, sourceUrl, duration: duration === "" ? null : duration, totalPages: totalPages === "" ? null : totalPages, ...(typeof archived === "boolean" ? { archived } : {}) } });
   if (req.body.sourceUrl && req.body.sourceUrl !== existing.sourceUrl) await removeMaterialFileIfUnused(existing.sourceUrl);
   res.json(m);
 });
