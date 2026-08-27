@@ -136,8 +136,8 @@ export default function Manage() {
 
       {course && (
         <>
-          <details open className="section-card space-y-5">
-            <summary className="cursor-pointer list-none font-semibold">Struktur modul, dosen, dan mahasiswa</summary>
+          <details open className="group section-card space-y-5">
+            <summary className="flex cursor-pointer list-none items-center justify-between font-semibold"><span>Struktur modul, dosen, dan mahasiswa</span><ChevronDown size={18} className="text-zinc-400 transition-transform group-open:rotate-180" /></summary>
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-200"><Settings2 size={19} /></div>
               <div><p className="eyebrow">Course structure</p><h2 className="mt-1 font-semibold">Modul untuk {course.title}</h2><p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Susun materi ke dalam modul yang mudah dipindai.</p></div>
@@ -168,8 +168,8 @@ export default function Manage() {
             </div>
           </details>
 
-          <details className="section-card space-y-5">
-            <summary className="cursor-pointer list-none font-semibold">Materi</summary>
+          <details className="group section-card space-y-5">
+            <summary className="flex cursor-pointer list-none items-center justify-between font-semibold"><span>Materi</span><ChevronDown size={18} className="text-zinc-400 transition-transform group-open:rotate-180" /></summary>
             <button onClick={() => { setEditingMaterialId("new"); setMat((m) => ({ ...m, moduleId: course.modules[0]?.id || "", title: "", sourceUrl: "", duration: "", totalPages: "" })); }} className="primary-button"><Plus size={17} /> Tambah materi</button>
             {editingMaterialId && <>
             <div className="flex items-start gap-3">
@@ -207,8 +207,8 @@ export default function Manage() {
             </div>
           </details>
 
-          <details className="section-card space-y-5">
-            <summary className="cursor-pointer list-none font-semibold">Quiz dan soal</summary>
+          <details className="group section-card space-y-5">
+            <summary className="flex cursor-pointer list-none items-center justify-between font-semibold"><span>Quiz dan soal</span><ChevronDown size={18} className="text-zinc-400 transition-transform group-open:rotate-180" /></summary>
             <button onClick={() => { setEditingQuizId("new"); setQuiz((q) => ({ ...q, moduleId: course.modules[0]?.id || "", title: "", questions: [{ text: "", options: ["", ""], correctIndex: 0, imageUrl: "" }] })); }} className="primary-button"><Plus size={17} /> Tambah quiz</button>
             {editingQuizId && <>
             <div className="flex items-start gap-3">
