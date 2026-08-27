@@ -98,6 +98,27 @@ r.get("/rekap/:courseId", requireAuth as any, async (req:any,res)=>{
   res.json({ course, rekap });
 });
 
+// Detailed student report for assessment — instructor/admin only.
+r.get("/rekap/:courseId/student/:studentId", requireAuth as any, async (req: any, res) => {
+  if (!["ADMIN", "DOSEN"].includes(req.user.role)) return res.status(403).json({ message: "Forbidden" });
+  const enrollment = await prisma.enrollment.findUnique({ where: { userId_courseId: { userId: req.params.studentId, courseId: req.params.courseId } }, include: { user: { select: { id: true, nim: true, name: true, role: true } } } });
+  if (!enrollment) return res.status(404).json({ message: "Mahasiswa tidak terdaftar pada matkul ini." });
+  const course = await prisma.course.findUnique({
+    where: { id: req.params.courseId },
+    include: { modules: { orderBy: { order: "asc" }, include: { materials: { orderBy: { order: "asc" } }, assignments: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] }, quizzes: { orderBy: [{ order: "asc" }, { createdAt: "asc" }], include: { questions: { orderBy: { order: "asc" }, select: { id: true, text: true, options: true, correctIndex: true, points: true, imageUrl: true } } } } } } } as any,
+  });
+  if (!course) return res.status(404).json({ message: "course not found" });
+  const materialIds = course.modules.flatMap((m: any) => m.materials.map((item: any) => item.id));
+  const quizIds = course.modules.flatMap((m: any) => m.quizzes.map((item: any) => item.id));
+  const [videos, slides, downloads, attempts] = await Promise.all([
+    prisma.videoProgress.findMany({ where: { userId: req.params.studentId, materialId: { in: materialIds } } }),
+    prisma.slideProgress.findMany({ where: { userId: req.params.studentId, materialId: { in: materialIds } } }),
+    prisma.materialDownload.findMany({ where: { userId: req.params.studentId, materialId: { in: materialIds } } }),
+    prisma.quizAttempt.findMany({ where: { userId: req.params.studentId, quizId: { in: quizIds } }, orderBy: { startedAt: "desc" } }),
+  ]);
+  res.json({ course: { id: course.id, title: course.title }, student: enrollment.user, modules: course.modules, progress: { videos, slides, downloads }, attempts });
+});
+
 // integration export (API_KEY)
 r.get("/integration/export/:courseId", requireApiKey as any, async (req,res)=>{
   const courseId = req.params.courseId;

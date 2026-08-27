@@ -12,6 +12,7 @@ import Quiz from "./pages/Quiz";
 import Rekap from "./pages/Rekap";
 import Manage from "./pages/Manage";
 import Users from "./pages/Users";
+import StudentProgress from "./pages/StudentProgress";
 const qc=new QueryClient();
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -55,6 +56,7 @@ export default function App(){
             <Route path="/material/:id" element={<Protected><Layout><MaterialView/></Layout></Protected>}/>
             <Route path="/quiz/:id" element={<Protected><Layout><Quiz/></Layout></Protected>}/>
             <Route path="/rekap" element={<Protected roles={["ADMIN","DOSEN"]}><Layout><Rekap/></Layout></Protected>}/>
+            <Route path="/rekap/:courseId/student/:studentId" element={<Protected roles={["ADMIN","DOSEN"]}><Layout><StudentProgress/></Layout></Protected>}/>
             <Route path="/manage" element={<Protected roles={["ADMIN","DOSEN"]}><Layout><Manage/></Layout></Protected>}/>
             <Route path="/users" element={<Protected roles={["ADMIN"]}><Layout><Users/></Layout></Protected>}/>
             <Route path="*" element={<Navigate to="/"/>}/>
