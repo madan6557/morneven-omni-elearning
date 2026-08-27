@@ -5,6 +5,7 @@ CREATE TABLE "AssignmentSubmission" (
   "note" TEXT,
   "fileUrl" TEXT,
   "fileName" TEXT,
+  "externalUrl" TEXT,
   "score" REAL,
   "feedback" TEXT,
   "submittedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

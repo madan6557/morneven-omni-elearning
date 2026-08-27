@@ -195,6 +195,7 @@ model AssignmentSubmission {
   note         String?
   fileUrl      String?
   fileName     String?
+  externalUrl  String?
   score        Float?
   feedback     String?
   submittedAt  DateTime   @default(now())

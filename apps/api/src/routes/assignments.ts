@@ -9,7 +9,16 @@ const r = Router();
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 const uploadRoot = path.resolve(uploadDir);
-const upload = multer({ storage: multer.diskStorage({ destination: (_req, _file, cb) => cb(null, uploadDir), filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_")}`) }), limits: { fileSize: 25 * 1024 * 1024 } });
+const allowedSubmissionTypes: Record<string, string[]> = {
+  ".pdf": ["application/pdf"], ".doc": ["application/msword"], ".docx": ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+  ".xls": ["application/vnd.ms-excel"], ".xlsx": ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+  ".ppt": ["application/vnd.ms-powerpoint"], ".pptx": ["application/vnd.openxmlformats-officedocument.presentationml.presentation"],
+  ".txt": ["text/plain"], ".csv": ["text/csv", "application/csv"],
+  ".jpg": ["image/jpeg"], ".jpeg": ["image/jpeg"], ".png": ["image/png"], ".gif": ["image/gif"], ".webp": ["image/webp"],
+  ".mp4": ["video/mp4"], ".mov": ["video/quicktime"], ".webm": ["video/webm"], ".mp3": ["audio/mpeg"], ".wav": ["audio/wav", "audio/x-wav"]
+};
+const upload = multer({ storage: multer.diskStorage({ destination: (_req, _file, cb) => cb(null, uploadDir), filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_")}`) }), limits: { fileSize: 25 * 1024 * 1024 }, fileFilter: (_req, file, cb) => { const ext = path.extname(file.originalname).toLowerCase(); cb(null, Boolean(allowedSubmissionTypes[ext]?.includes(file.mimetype))); } });
+const safeUpload = (req: any, res: any, next: any) => upload.single("file")(req, res, (error: any) => error ? res.status(error.code === "LIMIT_FILE_SIZE" ? 413 : 400).json({ message: error.code === "LIMIT_FILE_SIZE" ? "Ukuran file maksimal 25 MB." : "Format file tidak diizinkan. Gunakan PDF, Office, TXT/CSV, gambar, audio, atau video." }) : next());
 const localFile = (url?: string | null) => url?.startsWith("/uploads/") ? path.resolve(uploadRoot, url.slice("/uploads/".length)) : null;
 const removeSubmissionFile = async (url?: string | null) => { const file = localFile(url); if (file && file.startsWith(`${uploadRoot}${path.sep}`) && fs.existsSync(file)) await fs.promises.unlink(file); };
 const orderItems = (moduleId: string) => prisma.assignment.findMany({ where: { moduleId }, orderBy: [{ order: "asc" }, { createdAt: "asc" }] });
@@ -40,14 +49,17 @@ r.put("/:id", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (r
   res.json(await prisma.assignment.update({ where: { id: req.params.id }, data: { moduleId, title: title?.trim(), description: description || null, deadline: deadline ? new Date(deadline) : null, ...(typeof archived === "boolean" ? { archived } : {}) } }));
 });
 
-r.post("/:id/submit", requireAuth as any, upload.single("file"), async (req: any, res) => {
+r.post("/:id/submit", requireAuth as any, safeUpload, async (req: any, res) => {
   if (req.user.role !== "MAHASISWA") return res.status(403).json({ message: "Hanya mahasiswa yang dapat mengumpulkan tugas." });
   const assignment = await prisma.assignment.findUnique({ where: { id: req.params.id } });
   if (!assignment || assignment.archived) return res.status(404).json({ message: "Tugas tidak tersedia." });
   if (assignment.deadline && assignment.deadline < new Date()) { if (req.file) await removeSubmissionFile(`/uploads/${req.file.filename}`); return res.status(403).json({ message: "Deadline tugas telah lewat." }); }
+  const externalUrl = String(req.body.externalUrl || "").trim() || null;
+  if (externalUrl) { try { const url = new URL(externalUrl); if (url.protocol !== "https:") throw new Error(); } catch { if (req.file) await removeSubmissionFile(`/uploads/${req.file.filename}`); return res.status(400).json({ message: "Link submission harus berupa URL HTTPS yang valid." }); } }
+  if (!req.file && !externalUrl) return res.status(400).json({ message: "Upload file atau isi link submission." });
   const previous = await prisma.assignmentSubmission.findUnique({ where: { assignmentId_userId: { assignmentId: assignment.id, userId: req.user.id } } });
   const fileUrl = req.file ? `/uploads/${req.file.filename}` : previous?.fileUrl || null;
-  const submission = await prisma.assignmentSubmission.upsert({ where: { assignmentId_userId: { assignmentId: assignment.id, userId: req.user.id } }, update: { note: req.body.note || null, fileUrl, fileName: req.file?.originalname || previous?.fileName || null, submittedAt: new Date(), score: null, feedback: null, gradedAt: null }, create: { assignmentId: assignment.id, userId: req.user.id, note: req.body.note || null, fileUrl, fileName: req.file?.originalname || null } });
+  const submission = await prisma.assignmentSubmission.upsert({ where: { assignmentId_userId: { assignmentId: assignment.id, userId: req.user.id } }, update: { note: req.body.note || null, fileUrl, fileName: req.file?.originalname || previous?.fileName || null, externalUrl, submittedAt: new Date(), score: null, feedback: null, gradedAt: null }, create: { assignmentId: assignment.id, userId: req.user.id, note: req.body.note || null, fileUrl, fileName: req.file?.originalname || null, externalUrl } });
   if (req.file && previous?.fileUrl && previous.fileUrl !== fileUrl) await removeSubmissionFile(previous.fileUrl);
   res.status(201).json(submission);
 });
