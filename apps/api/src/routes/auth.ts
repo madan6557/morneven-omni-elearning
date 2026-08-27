@@ -2,7 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma.js";
 import { signToken } from "../lib/jwt.js";
-import { ChangePasswordSchema, LoginSchema, RegisterSchema } from "@repo/shared";
+import { ChangePasswordSchema, LoginSchema, RegisterSchema, UpdateUserSchema } from "@repo/shared";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { audit } from "../lib/audit.js";
 const r = Router();
@@ -78,7 +78,7 @@ r.get("/users", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (
 
 r.patch("/users/:id/password", requireAuth as any, requireRole("ADMIN") as any, async (req: any, res) => {
   const parsed = ChangePasswordSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: "Password minimal 6 karakter." });
+  if (!parsed.success) return res.status(400).json({ message: "Password baru minimal 8 karakter dan maksimal 128 karakter." });
   const user = await prisma.user.findUnique({ where: { id: req.params.id }, select: { id: true } });
   if (!user) return res.status(404).json({ message: "User tidak ditemukan." });
   await prisma.user.update({ where: { id: user.id }, data: { password: await bcrypt.hash(parsed.data.password, 10), tokenVersion: { increment: 1 } } });
@@ -88,7 +88,7 @@ r.patch("/users/:id/password", requireAuth as any, requireRole("ADMIN") as any, 
 
 r.patch("/me/password", requireAuth as any, async (req: any, res) => {
   const parsed = ChangePasswordSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: "Password minimal 6 karakter." });
+  if (!parsed.success) return res.status(400).json({ message: "Password baru minimal 8 karakter dan maksimal 128 karakter." });
   const user = await prisma.user.update({ where: { id: req.user.id }, data: { password: await bcrypt.hash(parsed.data.password, 10), tokenVersion: { increment: 1 } }, select: { id: true, nim: true, role: true, tokenVersion: true } });
   setSessionCookie(res, signToken({ id: user.id, nim: user.nim, role: user.role, tokenVersion: user.tokenVersion }));
   void audit(req.user.id, "CHANGE_PASSWORD", "User", req.user.id);
@@ -96,13 +96,13 @@ r.patch("/me/password", requireAuth as any, async (req: any, res) => {
 });
 
 r.put("/users/:id", requireAuth as any, requireRole("ADMIN") as any, async (req: any, res) => {
-  const nim = String(req.body.nim || "").trim();
-  const name = String(req.body.name || "").trim();
-  const role = String(req.body.role || "");
-  if (nim.length < 3 || name.length < 2 || !["ADMIN", "DOSEN", "MAHASISWA"].includes(role)) return res.status(400).json({ message: "Data user tidak valid." });
+  const parsed = UpdateUserSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "NIM/NIDN, nama, role, atau status akun tidak valid.", issues: parsed.error.issues });
+  const { nim, name, role, isActive } = parsed.data;
+  if (req.params.id === req.user.id && isActive === false) return res.status(400).json({ message: "Akun yang sedang digunakan tidak dapat dinonaktifkan." });
   const existing = await prisma.user.findFirst({ where: { nim, NOT: { id: req.params.id } }, select: { id: true } });
   if (existing) return res.status(409).json({ message: "NIM/identifier sudah digunakan." });
-  try { const user = await prisma.user.update({ where: { id: req.params.id }, data: { nim, name, role }, select: { id: true, nim: true, name: true, role: true, lastSeenAt: true } }); void audit(req.user.id, "UPDATE", "User", user.id, { role }); res.json(user); } catch { res.status(404).json({ message: "User tidak ditemukan." }); }
+  try { const user = await prisma.user.update({ where: { id: req.params.id }, data: { nim, name, role, ...(isActive !== undefined ? { isActive } : {}) }, select: { id: true, nim: true, name: true, role: true, isActive: true, lastSeenAt: true } }); void audit(req.user.id, "UPDATE", "User", user.id, { role, isActive }); res.json(user); } catch { res.status(404).json({ message: "User tidak ditemukan." }); }
 });
 
 r.delete("/users/:id", requireAuth as any, requireRole("ADMIN") as any, async (req: any, res) => {

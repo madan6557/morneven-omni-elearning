@@ -1,10 +1,13 @@
 import { z } from "zod";
 
-// auth
-export const LoginSchema = z.object({ nim: z.string().min(3), password: z.string().min(3) });
+// nim juga menampung NIDN dan identifier admin, jadi tidak dibatasi numerik.
+export const IdentifierSchema = z.string().trim().min(3, "Identifier minimal 3 karakter").max(50, "Identifier maksimal 50 karakter").regex(/^[A-Za-z0-9._-]+$/, "Identifier hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda minus");
+export const PasswordSchema = z.string().min(8, "Password minimal 8 karakter").max(128, "Password maksimal 128 karakter");
+export const LoginSchema = z.object({ nim: IdentifierSchema, password: z.string().min(1, "Password wajib diisi").max(128) });
 export type LoginDTO = z.infer<typeof LoginSchema>;
-export const RegisterSchema = z.object({ nim: z.string().min(3), name: z.string().min(2), password: z.string().min(6), role: z.enum(["ADMIN","DOSEN","MAHASISWA"]).default("MAHASISWA") });
-export const ChangePasswordSchema = z.object({ password: z.string().min(6, "Password minimal 6 karakter") });
+export const RegisterSchema = z.object({ nim: IdentifierSchema, name: z.string().trim().min(2).max(100), password: PasswordSchema, role: z.enum(["ADMIN","DOSEN","MAHASISWA"]).default("MAHASISWA") });
+export const ChangePasswordSchema = z.object({ password: PasswordSchema });
+export const UpdateUserSchema = z.object({ nim: IdentifierSchema, name: z.string().trim().min(2).max(100), role: z.enum(["ADMIN","DOSEN","MAHASISWA"]), isActive: z.boolean().optional() });
 
 // progress
 export const VideoProgressSchema = z.object({ materialId: z.string(), pos: z.number().min(0), duration: z.number().min(1) });
@@ -20,7 +23,7 @@ export const CreateQuizSchema = z.object({
   courseId: z.string().optional(),
   moduleId: z.string().optional(),
   passingScore: z.number().min(0).max(100).default(60),
-  timeLimit: z.number().nullable().optional(),
+  timeLimit: z.number().int().positive().nullable().optional(),
   timerMode: z.enum(["INDEPENDENT", "SYNC_DEADLINE"]).default("INDEPENDENT"),
   attemptLimit: z.number().int().min(-1).default(1),
   showAnswers: z.boolean().default(false),
@@ -30,15 +33,19 @@ export const CreateQuizSchema = z.object({
   resultReleaseMode: z.enum(["HIDDEN", "MANUAL", "SCHEDULED"]).default("HIDDEN"),
   resultReleaseAt: z.string().datetime().nullable().optional(),
   availableFrom: z.string().datetime().nullable().optional(),
+  deadline: z.string().datetime().nullable().optional(),
   questions: z.array(z.object({
     type: z.enum(["MULTIPLE_CHOICE", "ESSAY"]).default("MULTIPLE_CHOICE"),
     text: z.string().min(1),
     options: z.array(z.string()).default([]),
-    correctIndex: z.number().min(0).nullable().optional(),
-    points: z.number().default(10),
-    order: z.number().optional(),
+    correctIndex: z.number().int().min(0).nullable().optional(),
+    points: z.number().finite().positive().default(10),
+    order: z.number().int().positive().optional(),
     imageUrl: z.string().refine((value) => value.startsWith("/") || /^https?:\/\//i.test(value), "imageUrl must be an absolute or relative URL").nullable().optional(),
   }).superRefine((question, ctx) => { if (question.type === "MULTIPLE_CHOICE" && (question.options.length < 2 || question.correctIndex === null || question.correctIndex === undefined || question.correctIndex >= question.options.length)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Multiple choice wajib memiliki minimal 2 opsi dan jawaban benar." }); })).min(1)
+}).superRefine((quiz, ctx) => {
+  if (quiz.availableFrom && quiz.deadline && new Date(quiz.deadline) < new Date(quiz.availableFrom)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["deadline"], message: "Deadline tidak boleh sebelum jadwal buka." });
+  if (quiz.resultReleaseMode === "SCHEDULED" && !quiz.resultReleaseAt) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["resultReleaseAt"], message: "Jadwal publikasi wajib diisi untuk mode terjadwal." });
 });
 
 export const ModuleTypeSchema = z.enum(["REGULAR", "UTS", "UAS"]);
@@ -54,9 +61,9 @@ export const CreateMaterialSchema = z.object({
   title: z.string().min(2),
   type: z.enum(["VIDEO","PDF","PPT"]),
   sourceType: z.enum(["youtube","drive","upload"]),
-  sourceUrl: z.string().min(1),
-  duration: z.number().optional(),
-  totalPages: z.number().optional(),
+  sourceUrl: z.string().min(1).refine((value) => value.startsWith("/uploads/") || /^https?:\/\//i.test(value), "Sumber materi harus berupa URL HTTP(S) atau file upload"),
+  duration: z.number().finite().nonnegative().optional(),
+  totalPages: z.number().int().positive().optional(),
   requireCompletionForDownload: z.boolean().optional(),
   availableFrom: z.string().datetime().nullable().optional(),
   order: z.number().optional(),

@@ -40,7 +40,7 @@ Untuk arti istilah secara cepat, buka artikel **Glosarium istilah OMNI** pada me
 3. Gunakan tombol tema untuk mode terang/gelap.
 4. Tekan Keluar pada perangkat bersama.
 
-Reset password saat ini dilakukan oleh Admin. User juga dapat mengganti password sendiri melalui panel **Akun aktif → Ganti password**. Password baru minimal 6 karakter. Jangan membagikan password atau token sesi.
+Reset password saat ini dilakukan oleh Admin. User juga dapat mengganti password sendiri melalui panel **Akun aktif → Ganti password**. Password baru minimal 8 karakter dan maksimal 128 karakter. NIM/NIDN/identifier boleh berupa huruf dan angka (contoh `2025001`, `admin001`), dengan panjang 3–50 karakter; spasi dan simbol selain titik, garis bawah, atau tanda minus ditolak. Jangan membagikan password atau token sesi.
 
 ## 4. Panduan mahasiswa
 
