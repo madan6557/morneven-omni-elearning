@@ -58,7 +58,7 @@ export default function CourseDetail() {
         ))}
       </div>
 
-      {user?.role !== "MAHASISWA" && <div className="flex flex-col gap-3 sm:flex-row"><Link to="/manage" className="primary-button"><ArrowUpRight size={17} /> Kelola materi & quiz</Link><Link to="/rekap" className="secondary-button">Lihat rekap progress</Link></div>}
+      {user?.role !== "MAHASISWA" && <div className="flex flex-col gap-3 sm:flex-row"><Link to={`/manage?courseId=${encodeURIComponent(c.id)}`} className="primary-button"><ArrowUpRight size={17} /> Kelola mata kuliah</Link><Link to="/rekap" className="secondary-button">Lihat rekap progress</Link></div>}
     </div>
   );
 }

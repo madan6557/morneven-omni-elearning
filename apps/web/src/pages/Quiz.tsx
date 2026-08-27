@@ -4,6 +4,8 @@ import api from "../lib/api";
 import { useFeedback } from "../context/FeedbackContext";
 import { Spinner } from "../components/Loading";
 
+const mediaUrl = (value: string) => value.startsWith("/") ? `${api.defaults.baseURL || ""}${value}` : value;
+
 export default function Quiz(){
   const {id}=useParams();
   const [q,setQ]=useState<any>(null);
@@ -36,7 +38,7 @@ export default function Quiz(){
       <Link to={q.moduleId ? `/courses/${q.module?.courseId||""}` : `/courses/${q.courseId}`} className="text-sm text-zinc-500 dark:text-zinc-400">← Kembali</Link>
       <div className="bg-white dark:bg-zinc-800 border dark:border-zinc-700 rounded-2xl p-6">
         <h1 className="text-xl font-bold">{q.title}</h1>
-        <div className="text-sm text-zinc-500 dark:text-zinc-400">{q.kind} · {q.questions.length} soal · Lulus {q.passingScore}% · Batas {q.attemptLimit}x {q.showAnswers ? "· Kunci jawaban tampil setelah selesai" : ""}</div>
+        <div className="text-sm text-zinc-500 dark:text-zinc-400">{q.kind} · {q.questions.length} soal · Lulus {q.passingScore}% · {q.attemptLimit === -1 ? "Attempt tak terbatas" : q.attemptLimit === 0 ? "Quiz ditutup" : `Batas ${q.attemptLimit}x`} {q.showAnswers ? "· Kunci jawaban tampil setelah selesai" : ""}</div>
         {result && (
           <div className={`mt-4 p-4 rounded-xl border dark:border-zinc-700 ${result.passed?"bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800":"bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800"}`}>
             <div className="font-bold">{result.passed?"Lulus ✓":"Belum Lulus"}</div>
@@ -49,6 +51,7 @@ export default function Quiz(){
         {q.questions.map((qq:any, idx:number)=>(
           <div key={qq.id} className="bg-white dark:bg-zinc-800 border dark:border-zinc-700 rounded-2xl p-5">
             <div className="font-medium">{idx+1}. {qq.text}</div>
+            {qq.imageUrl && <img src={mediaUrl(qq.imageUrl)} alt={`Gambar soal ${idx + 1}`} className="mt-3 max-h-72 rounded-xl object-contain" />}
             <div className="mt-3 space-y-2">
               {(qq.options as string[]).map((opt, i)=>(
                 <label key={i} className={`flex gap-3 p-3 rounded-xl border dark:border-zinc-700 cursor-pointer ${answers[qq.id]===i?"bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 border-zinc-900":"bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:bg-zinc-800"}`}>
@@ -64,7 +67,7 @@ export default function Quiz(){
         ))}
       </div>
 
-      <button disabled={submitting} onClick={submit} className="inline-flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-medium disabled:cursor-wait disabled:opacity-70">{submitting && <Spinner />} {submitting ? "Mengirim..." : "Kirim Jawaban"}</button>
+      <button disabled={submitting || q.attemptLimit === 0} onClick={submit} className="inline-flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-medium disabled:cursor-wait disabled:opacity-70">{submitting && <Spinner />} {q.attemptLimit === 0 ? "Quiz ditutup" : submitting ? "Mengirim..." : "Kirim Jawaban"}</button>
 
       {attempts.length>0 && (
         <div className="bg-white dark:bg-zinc-800 border dark:border-zinc-700 rounded-2xl p-5">

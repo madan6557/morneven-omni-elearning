@@ -20,14 +20,15 @@ export const CreateQuizSchema = z.object({
   moduleId: z.string().optional(),
   passingScore: z.number().min(0).max(100).default(60),
   timeLimit: z.number().nullable().optional(),
-  attemptLimit: z.number().min(1).default(1),
+  attemptLimit: z.number().int().min(-1).default(1),
   showAnswers: z.boolean().default(false),
   questions: z.array(z.object({
     text: z.string().min(1),
-    options: z.array(z.string()).min(2).max(6),
+    options: z.array(z.string()).min(2),
     correctIndex: z.number().min(0),
     points: z.number().default(10),
     order: z.number().optional(),
+    imageUrl: z.string().refine((value) => value.startsWith("/") || /^https?:\/\//i.test(value), "imageUrl must be an absolute or relative URL").nullable().optional(),
   })).min(1)
 });
 

@@ -1,103 +1,51 @@
 import { Router } from "express";
+import multer from "multer";
+import * as XLSX from "xlsx";
+import path from "path";
+import fs from "fs";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { CreateQuizSchema, SubmitQuizSchema } from "@repo/shared";
+
 const r = Router();
+const uploadDir = process.env.UPLOAD_DIR || "./uploads";
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+const imageUpload = multer({ storage: multer.diskStorage({ destination: (_req, _file, cb) => cb(null, uploadDir), filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_")}`) }), limits: { fileSize: 5 * 1024 * 1024 }, fileFilter: (_req, file, cb) => cb(null, /^image\/(jpeg|png|gif|webp)$/.test(file.mimetype)) });
+const excelUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-r.get("/", requireAuth as any, async (req:any,res)=>{
-  const { courseId, moduleId } = req.query as any;
-  const where:any={};
-  if(courseId) where.courseId=courseId;
-  if(moduleId) where.moduleId=moduleId;
-  const qs = await prisma.quiz.findMany({ where, include:{ questions:{ orderBy:{ order:"asc"}}, _count:{ select:{ questions:true } }}, orderBy:{ createdAt:"desc"}});
-  const parsed = qs.map((q:any)=>({ ...q, questions: q.questions.map((qq:any)=>{ const item = { ...qq, options: typeof qq.options === "string" ? JSON.parse(qq.options) : qq.options }; if (req.user.role === "MAHASISWA") delete item.correctIndex; return item; })}));
-  res.json(parsed);
+const questionOut = (q: any, hide: boolean) => { const item = { ...q, options: typeof q.options === "string" ? JSON.parse(q.options) : q.options }; if (hide) delete item.correctIndex; return item; };
+const quizOut = (q: any, hide = false) => ({ ...q, questions: q.questions?.map((item: any) => questionOut(item, hide)) });
+
+r.get("/template", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, (_req, res) => {
+  const sheet = XLSX.utils.aoa_to_sheet([["title", "kind", "module", "passingScore", "timeLimit", "attemptLimit", "showAnswers", "question", "options", "correctIndex", "points", "imageUrl"], ["Quiz contoh", "QUIZ", "Modul 1", 60, "", -1, false, "Ibukota Indonesia?", "Jakarta||Bandung||Surabaya", 0, 10, ""]]);
+  const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, "Questions");
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); res.setHeader("Content-Disposition", "attachment; filename=template-soal.xlsx"); res.send(XLSX.write(book, { type: "buffer", bookType: "xlsx" }));
 });
 
-r.get("/:id", requireAuth as any, async (req,res)=>{
-  const q = await prisma.quiz.findUnique({ where:{id:req.params.id}, include:{ questions:{ orderBy:{ order:"asc"}}, module:true, course:true }});
-  if(!q) return res.status(404).json({message:"Not found"});
-  const out = { ...q, questions: (q.questions as any[]).map((qq:any) => { const item = { ...qq, options: typeof qq.options === "string" ? JSON.parse(qq.options) : qq.options }; if ((req as any).user?.role === "MAHASISWA") delete item.correctIndex; return item; }) };
-  res.json(out);
+r.post("/upload-image", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, imageUpload.single("file"), (req: any, res) => { if (!req.file) return res.status(400).json({ message: "File gambar wajib JPG, PNG, GIF, atau WEBP dan maksimal 5MB." }); res.status(201).json({ imageUrl: `/uploads/${req.file.filename}` }); });
+
+r.get("/", requireAuth as any, async (req: any, res) => { const where: any = {}; if (req.query.courseId) where.courseId = req.query.courseId; if (req.query.moduleId) where.moduleId = req.query.moduleId; const qs = await prisma.quiz.findMany({ where, include: { questions: { orderBy: { order: "asc" } }, _count: { select: { questions: true } } }, orderBy: { createdAt: "desc" } }); res.json(qs.map((q: any) => quizOut(q, req.user.role === "MAHASISWA"))); });
+
+r.get("/:id", requireAuth as any, async (req: any, res) => { const q = await prisma.quiz.findUnique({ where: { id: req.params.id }, include: { questions: { orderBy: { order: "asc" } }, module: true, course: true } }); if (!q) return res.status(404).json({ message: "Not found" }); res.json(quizOut(q, req.user.role === "MAHASISWA")); });
+
+r.post("/", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (req, res) => { const parsed = CreateQuizSchema.safeParse(req.body); if (!parsed.success) return res.status(400).json(parsed.error); const { title, kind, courseId, moduleId, passingScore, timeLimit, attemptLimit, showAnswers, questions } = parsed.data; const quiz = await prisma.quiz.create({ data: { title, kind, courseId: courseId || null, moduleId: moduleId || null, passingScore, timeLimit: timeLimit ?? null, attemptLimit, showAnswers } }); await prisma.question.createMany({ data: questions.map((q, i) => ({ quizId: quiz.id, order: q.order ?? i + 1, text: q.text, options: JSON.stringify(q.options), correctIndex: q.correctIndex, points: q.points, imageUrl: q.imageUrl || null })) }); const full = await prisma.quiz.findUnique({ where: { id: quiz.id }, include: { questions: true } }); res.status(201).json(quizOut(full)); });
+
+r.post("/import", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, excelUpload.single("file"), async (req: any, res) => {
+  if (!req.file) return res.status(400).json({ message: "File Excel wajib dipilih." }); const courseId = String(req.body.courseId || ""); if (!courseId) return res.status(400).json({ message: "courseId wajib diisi." });
+  try {
+    const workbook = XLSX.read(req.file.buffer, { type: "buffer" }); const sheet = workbook.Sheets.Questions || workbook.Sheets[workbook.SheetNames[0]]; const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" }) as any[]; if (!rows.length) return res.status(400).json({ message: "Sheet Excel tidak berisi soal." });
+    const modules = await prisma.module.findMany({ where: { courseId } }); const byKey = new Map(modules.flatMap((m) => [[m.id, m], [m.title.trim().toLowerCase(), m]])); const groups = new Map<string, any>(); const errors: string[] = [];
+    rows.forEach((row, i) => { const line = i + 2; const title = String(row.title || "").trim(); const mod = byKey.get(String(row.module || "").trim().toLowerCase()); const options = String(row.options || "").split("||").map((x) => x.trim()).filter(Boolean); const correctIndex = Number(row.correctIndex); const attemptLimit = row.attemptLimit === "" ? -1 : Number(row.attemptLimit); const before = errors.length; if (!title) errors.push(`Baris ${line}: title wajib diisi.`); if (!mod) errors.push(`Baris ${line}: module tidak ditemukan.`); if (!String(row.question || "").trim()) errors.push(`Baris ${line}: question wajib diisi.`); if (options.length < 2) errors.push(`Baris ${line}: minimal 2 opsi.`); if (!Number.isInteger(correctIndex) || correctIndex < 0 || correctIndex >= options.length) errors.push(`Baris ${line}: correctIndex tidak valid.`); if (!Number.isInteger(attemptLimit) || attemptLimit < -1) errors.push(`Baris ${line}: attemptLimit harus -1, 0, atau bilangan positif.`); if (errors.length > before) return; const key = `${title}\u0000${mod!.id}`; if (!groups.has(key)) groups.set(key, { title, moduleId: mod!.id, kind: row.kind || "QUIZ", passingScore: Number(row.passingScore || 60), timeLimit: row.timeLimit === "" ? null : Number(row.timeLimit), attemptLimit, showAnswers: row.showAnswers === true || String(row.showAnswers).toLowerCase() === "true", questions: [] }); groups.get(key).questions.push({ text: String(row.question).trim(), options, correctIndex, points: Number(row.points || 10), imageUrl: String(row.imageUrl || "").trim() || null }); });
+    if (errors.length) return res.status(400).json({ message: "Import gagal. Perbaiki baris berikut.", errors });
+    const result = await prisma.$transaction(async (tx) => { let questionCount = 0; for (const data of groups.values()) { const q = await tx.quiz.create({ data: { title: data.title, kind: data.kind, courseId, moduleId: data.moduleId, passingScore: data.passingScore, timeLimit: data.timeLimit, attemptLimit: data.attemptLimit, showAnswers: data.showAnswers } }); await tx.question.createMany({ data: data.questions.map((item: any, i: number) => ({ quizId: q.id, order: i + 1, text: item.text, options: JSON.stringify(item.options), correctIndex: item.correctIndex, points: item.points, imageUrl: item.imageUrl })) }); questionCount += data.questions.length; } return { quizCount: groups.size, questionCount }; }); res.status(201).json(result);
+  } catch (error: any) { res.status(400).json({ message: `Import gagal: ${error.message || "format file tidak valid"}` }); }
 });
 
-r.post("/", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
-  const parsed = CreateQuizSchema.safeParse(req.body);
-  if(!parsed.success) return res.status(400).json(parsed.error);
-  const { title, kind, courseId, moduleId, passingScore, timeLimit, attemptLimit, showAnswers, questions } = parsed.data;
-  const quiz = await prisma.quiz.create({ data:{ title, kind: kind as any, courseId: courseId||null, moduleId: moduleId||null, passingScore, timeLimit: timeLimit ?? null, attemptLimit, showAnswers }});
-  for(let i=0;i<questions.length;i++){
-    const qq = questions[i];
-    await prisma.question.create({ data:{ quizId: quiz.id, order: qq.order ?? i+1, text: qq.text, options: JSON.stringify(qq.options), correctIndex: qq.correctIndex, points: qq.points }});
-  }
-  const full = await prisma.quiz.findUnique({ where:{id:quiz.id}, include:{ questions:true }}) as any;
-  if(full) (full as any).questions = full.questions.map((qq:any)=>({ ...qq, options: typeof qq.options==="string" ? JSON.parse(qq.options) : qq.options }));
-  res.status(201).json(full);
-});
+r.put("/:id", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (req, res) => { const { questions, ...quizData } = req.body; const q = await prisma.$transaction(async (tx) => { await tx.quiz.update({ where: { id: req.params.id }, data: quizData }); if (Array.isArray(questions)) { await tx.question.deleteMany({ where: { quizId: req.params.id } }); await tx.question.createMany({ data: questions.map((item: any, i: number) => ({ quizId: req.params.id, order: item.order ?? i + 1, text: item.text, options: JSON.stringify(item.options), correctIndex: item.correctIndex, points: item.points ?? 10, imageUrl: item.imageUrl || null })) }); } return tx.quiz.findUnique({ where: { id: req.params.id }, include: { questions: { orderBy: { order: "asc" } } } }); }); if (!q) return res.status(404).json({ message: "Not found" }); res.json(quizOut(q)); });
+r.delete("/:id", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (req, res) => { await prisma.quiz.delete({ where: { id: req.params.id } }); res.json({ ok: true }); });
 
-r.put("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
-  const { questions, ...quizData } = req.body;
-  const q = await prisma.$transaction(async (tx) => {
-    const updated = await tx.quiz.update({ where:{id:req.params.id}, data: quizData });
-    if (Array.isArray(questions)) {
-      await tx.question.deleteMany({ where: { quizId: req.params.id } });
-      for (let i = 0; i < questions.length; i++) {
-        const item = questions[i];
-        await tx.question.create({ data: { quizId: req.params.id, order: item.order ?? i + 1, text: item.text, options: JSON.stringify(item.options), correctIndex: item.correctIndex, points: item.points ?? 10 } });
-      }
-    }
-    return tx.quiz.findUnique({ where:{id:req.params.id}, include:{ questions:{ orderBy:{ order:"asc" } } } });
-  });
-  if (!q) return res.status(404).json({message:"Not found"});
-  res.json({ ...q, questions: q.questions.map((qq:any) => ({ ...qq, options: typeof qq.options === "string" ? JSON.parse(qq.options) : qq.options })) });
-});
-
-r.delete("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
-  await prisma.quiz.delete({ where:{id:req.params.id}});
-  res.json({ok:true});
-});
-
-// start attempt
-r.post("/:id/start", requireAuth as any, async (req:any,res)=>{
-  const quiz = await prisma.quiz.findUnique({ where:{id:req.params.id}});
-  if(!quiz) return res.status(404).json({message:"Not found"});
-  const count = await prisma.quizAttempt.count({ where:{ userId:req.user.id, quizId:quiz.id }});
-  if(count >= quiz.attemptLimit) return res.status(400).json({message:`Batas percobaan ${quiz.attemptLimit} tercapai`});
-  const att = await prisma.quizAttempt.create({ data:{ userId:req.user.id, quizId:quiz.id }});
-  res.status(201).json(att);
-});
-
-// submit
-r.post("/:id/submit", requireAuth as any, async (req:any,res)=>{
-  const parsed = SubmitQuizSchema.safeParse(req.body);
-  if(!parsed.success) return res.status(400).json(parsed.error);
-  const quiz = await prisma.quiz.findUnique({ where:{id:req.params.id}, include:{ questions:true }});
-  if(!quiz) return res.status(404).json({message:"Not found"});
-  const qmap = new Map(quiz.questions.map(q=>[q.id,q]));
-  let score=0, max=0;
-  for(const qq of quiz.questions) max+=qq.points;
-  for(const a of parsed.data.answers){
-    const q = qmap.get(a.questionId);
-    if(q && a.chosen===q.correctIndex) score+=q.points;
-  }
-  const percent = max? (score/max)*100 : 0;
-  const passed = percent >= quiz.passingScore;
-  // find latest unfinished attempt
-  const last = await prisma.quizAttempt.findFirst({ where:{ userId:req.user.id, quizId:quiz.id, submittedAt:null }, orderBy:{ startedAt:"desc"}});
-  let att;
-  if(last){
-    att = await prisma.quizAttempt.update({ where:{id:last.id}, data:{ answers: JSON.stringify(parsed.data.answers), score: percent, passed, submittedAt: new Date() }});
-  } else {
-    att = await prisma.quizAttempt.create({ data:{ userId:req.user.id, quizId:quiz.id, answers: JSON.stringify(parsed.data.answers), score: percent, passed, submittedAt: new Date() }});
-  }
-  res.json({ ...att, maxScore:max, rawScore:score, answerKey: quiz.showAnswers ? Object.fromEntries(quiz.questions.map((q) => [q.id, q.correctIndex])) : undefined });
-});
-
-r.get("/:id/attempts", requireAuth as any, async (req:any,res)=>{
-  const where:any={ quizId:req.params.id };
-  if(req.user.role==="MAHASISWA") where.userId=req.user.id;
-  const atts = await prisma.quizAttempt.findMany({ where, include:{ user:{ select:{ nim:true, name:true }}}, orderBy:{ startedAt:"desc"}});
-  res.json(atts);
-});
+r.post("/:id/start", requireAuth as any, async (req: any, res) => { const quiz = await prisma.quiz.findUnique({ where: { id: req.params.id } }); if (!quiz) return res.status(404).json({ message: "Not found" }); if (quiz.attemptLimit === 0) return res.status(403).json({ message: "Quiz ini sedang ditutup." }); const count = await prisma.quizAttempt.count({ where: { userId: req.user.id, quizId: quiz.id, submittedAt: { not: null } } }); if (quiz.attemptLimit > 0 && count >= quiz.attemptLimit) return res.status(400).json({ message: `Batas percobaan ${quiz.attemptLimit} tercapai` }); res.status(201).json(await prisma.quizAttempt.create({ data: { userId: req.user.id, quizId: quiz.id } })); });
+r.post("/:id/submit", requireAuth as any, async (req: any, res) => { const parsed = SubmitQuizSchema.safeParse(req.body); if (!parsed.success) return res.status(400).json(parsed.error); const quiz = await prisma.quiz.findUnique({ where: { id: req.params.id }, include: { questions: true } }); if (!quiz) return res.status(404).json({ message: "Not found" }); if (quiz.attemptLimit === 0) return res.status(403).json({ message: "Quiz ini sedang ditutup." }); const last = await prisma.quizAttempt.findFirst({ where: { userId: req.user.id, quizId: quiz.id, submittedAt: null }, orderBy: { startedAt: "desc" } }); const submittedCount = await prisma.quizAttempt.count({ where: { userId: req.user.id, quizId: quiz.id, submittedAt: { not: null } } }); if (!last && quiz.attemptLimit > 0 && submittedCount >= quiz.attemptLimit) return res.status(400).json({ message: `Batas percobaan ${quiz.attemptLimit} tercapai` }); const map = new Map(quiz.questions.map((q) => [q.id, q])); const max = quiz.questions.reduce((s, q) => s + q.points, 0); const score = parsed.data.answers.reduce((s, a) => { const q = map.get(a.questionId); return s + (q && q.correctIndex === a.chosen ? q.points : 0); }, 0); const percent = max ? score / max * 100 : 0; const att = last ? await prisma.quizAttempt.update({ where: { id: last.id }, data: { answers: JSON.stringify(parsed.data.answers), score: percent, passed: percent >= quiz.passingScore, submittedAt: new Date() } }) : await prisma.quizAttempt.create({ data: { userId: req.user.id, quizId: quiz.id, answers: JSON.stringify(parsed.data.answers), score: percent, passed: percent >= quiz.passingScore, submittedAt: new Date() } }); res.json({ ...att, maxScore: max, rawScore: score, answerKey: quiz.showAnswers ? Object.fromEntries(quiz.questions.map((q) => [q.id, q.correctIndex])) : undefined }); });
+r.get("/:id/attempts", requireAuth as any, async (req: any, res) => { const where: any = { quizId: req.params.id }; if (req.user.role === "MAHASISWA") where.userId = req.user.id; res.json(await prisma.quizAttempt.findMany({ where, include: { user: { select: { nim: true, name: true } } }, orderBy: { startedAt: "desc" } })); });
 
 export default r;

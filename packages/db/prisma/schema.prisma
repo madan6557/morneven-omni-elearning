@@ -167,6 +167,7 @@ model Question {
   options      String // JSON stringify ["A","B","C","D"] for sqlite compat
   correctIndex Int
   points       Int    @default(10)
+  imageUrl     String?
 
   @@index([quizId])
 }
