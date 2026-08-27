@@ -19,7 +19,7 @@ packages/
 - FE: Vite 6, React 18, React Router, TanStack Query, Tailwind, axios
 - BE: Express 4, Prisma 5, PostgreSQL (SQLite fallback dev), Zod, JWT, multer
 - DB: `Course → Module → Material (VIDEO/PDF/PPT)` + `Enrollment` + `MaterialDownload` + `VideoProgress` + `SlideProgress` + `Quiz/Question/QuizAttempt`
-- Auth: NIM/password (bcrypt), role ADMIN/DOSEN/MAHASISWA, JWT httpOnly
+- Auth: NIM/password (bcrypt), role ADMIN/DOSEN/MAHASISWA, cookie JWT HttpOnly untuk browser, Bearer untuk integrasi
 - Tracking: `timeupdate` 5s (upload video), YT/Drive est., `viewedPages` JSON, download via `/download` endpoint
 - Quiz: PG 4 opsi, auto-nilai, pretest/posttest per modul
 
@@ -45,11 +45,13 @@ Course demo: `course-demo` dengan Modul 1 (YT video, upload video, PDF 12 hal), 
 
 ## API
 - `POST /api/auth/login` `{nim,password}` → `{token,user}`
-- `GET /api/courses` | `GET /api/courses/:id` | `POST /api/courses` (DOSEN/ADMIN)
+- `GET /api/courses` | `GET /api/courses/:id` | `POST /api/courses` (ADMIN)
 - `POST /api/materials` | `POST /api/materials/upload` (multipart) | `GET /api/materials/:id` | `GET /api/materials/:id/download` (track)
 - `POST /api/progress/video` `{materialId,pos,duration}` | `POST /api/progress/slide` `{materialId,page}` | `GET /api/progress/course/:id` | `GET /api/progress/rekap/:id` (DOSEN)
 - `POST /api/quizzes` | `GET /api/quizzes` | `POST /api/quizzes/:id/start` | `POST /api/quizzes/:id/submit` `{answers}`
 - `POST /api/integration/auth/sso` (JWT shared secret) | `GET /api/progress/integration/export/:courseId` (X-API-Key)
+- `GET /api/reports/courses/:courseId/export.xlsx` | `GET /api/reports/courses/:courseId/export.csv`
+- `GET /api/notifications` | `GET /api/calendar`
 
 ## FE Routes
 `/login`, `/` (dashboard), `/courses`, `/courses/:id`, `/material/:id` (video/pdf/ppt), `/quiz/:id`, `/rekap` (DOSEN), `/manage` (DOSEN), `/users` (ADMIN)

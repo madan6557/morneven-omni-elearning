@@ -6,6 +6,7 @@ import unzipper from "unzipper";
 import fs from "fs";
 import path from "path";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+import { audit } from "../lib/audit.js";
 
 const r = Router();
 const uploadRoot = path.resolve(process.env.UPLOAD_DIR || "./uploads");
@@ -45,6 +46,7 @@ r.post("/restore", requireAuth as any, requireRole("ADMIN") as any, zipUpload.si
       await fs.promises.mkdir(path.dirname(target), { recursive: true });
       await fs.promises.writeFile(target, await entry.buffer());
     }
+    void audit(req.user.id, "RESTORE", "Backup", undefined, { filename: req.file.originalname });
     res.json({ message: "Restore berhasil. Server perlu di-restart agar koneksi database dimuat ulang." });
   } catch (error: any) {
     res.status(400).json({ message: `Restore gagal: ${error.message || "format ZIP tidak valid"}` });

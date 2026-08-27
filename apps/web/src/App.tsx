@@ -16,6 +16,8 @@ import StudentProgress from "./pages/StudentProgress";
 import Assignment from "./pages/Assignment";
 import AssignmentSubmissions from "./pages/AssignmentSubmissions";
 import Help from "./pages/Help";
+import Notifications from "./pages/Notifications";
+import Calendar from "./pages/Calendar";
 const qc=new QueryClient();
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -65,6 +67,8 @@ export default function App(){
             <Route path="/manage" element={<Protected roles={["ADMIN","DOSEN"]}><Layout><Manage/></Layout></Protected>}/>
             <Route path="/users" element={<Protected roles={["ADMIN"]}><Layout><Users/></Layout></Protected>}/>
             <Route path="/help" element={<Protected><Layout><Help/></Layout></Protected>}/>
+            <Route path="/notifications" element={<Protected><Layout><Notifications/></Layout></Protected>}/>
+            <Route path="/calendar" element={<Protected><Layout><Calendar/></Layout></Protected>}/>
             <Route path="*" element={<Navigate to="/"/>}/>
             </Routes>
           </BrowserRouter>

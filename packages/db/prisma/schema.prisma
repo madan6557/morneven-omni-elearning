@@ -11,38 +11,73 @@ datasource db {
 }
 
 model User {
-  id         String   @id @default(cuid())
-  nim        String   @unique
-  name       String
-  password   String
-  role       String   @default("MAHASISWA") // ADMIN | DOSEN | MAHASISWA — ponytail: String for sqlite compat, enum for postgres
-  externalId String?  @unique
-  createdAt  DateTime @default(now())
-  lastSeenAt DateTime?
+  id           String    @id @default(cuid())
+  nim          String    @unique
+  name         String
+  password     String
+  role         String    @default("MAHASISWA") // ADMIN | DOSEN | MAHASISWA — ponytail: String for sqlite compat, enum for postgres
+  externalId   String?   @unique
+  createdAt    DateTime  @default(now())
+  lastSeenAt   DateTime?
+  isActive     Boolean   @default(true)
+  tokenVersion Int       @default(0)
 
-  enrollments        Enrollment[]
-  downloads          MaterialDownload[]
-  videoProgress      VideoProgress[]
-  slideProgress      SlideProgress[]
-  quizAttempts       QuizAttempt[]
-  taughtCourses      CourseInstructor[]
+  enrollments           Enrollment[]
+  downloads             MaterialDownload[]
+  videoProgress         VideoProgress[]
+  slideProgress         SlideProgress[]
+  quizAttempts          QuizAttempt[]
+  taughtCourses         CourseInstructor[]
   assignmentSubmissions AssignmentSubmission[]
-  quizAnswerGrades QuizAnswerGrade[]
+  quizAnswerGrades      QuizAnswerGrade[]
+  notifications         Notification[]
+  auditLogs             AuditLog[]
 
   @@index([role])
 }
 
 model Course {
-  id          String   @id @default(cuid())
+  id          String             @id @default(cuid())
   title       String
   description String?
-  externalId  String?  @unique
-  createdAt   DateTime @default(now())
+  externalId  String?            @unique
+  createdAt   DateTime           @default(now())
   modules     Module[]
   enrollments Enrollment[]
   quizzes     Quiz[] // pretest per course
   assignments Assignment[]
   instructors CourseInstructor[]
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  message   String
+  link      String?
+  eventKey  String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, eventKey])
+  @@index([userId, readAt])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String?
+  metadata  String   @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([entity, entityId])
 }
 
 model CourseInstructor {
@@ -64,31 +99,31 @@ model Module {
   order     Int      @default(0)
   createdAt DateTime @default(now())
 
-  materials Material[]
-  quizzes   Quiz[]
+  materials   Material[]
+  quizzes     Quiz[]
   assignments Assignment[]
 
-  @@index([courseId])
   @@unique([courseId, order])
+  @@index([courseId])
 }
 
 model Material {
-  id         String       @id @default(cuid())
-  moduleId   String
-  module     Module       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  title      String
-  type       String // VIDEO | PDF | PPT
-  sourceType String // youtube | drive | upload
-  sourceUrl  String // yt id / drive id / /uploads/xxx
-  duration   Int? // seconds for video
-  totalPages Int? // for PDF
-  archived   Boolean  @default(false)
-  requireCompletionForDownload Boolean @default(false)
-  availableFrom DateTime?
-  order      Int          @default(0)
-  contentOrder Int         @default(0)
-  externalId String?      @unique
-  createdAt  DateTime     @default(now())
+  id                           String    @id @default(cuid())
+  moduleId                     String
+  module                       Module    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title                        String
+  type                         String // VIDEO | PDF | PPT
+  sourceType                   String // youtube | drive | upload
+  sourceUrl                    String // yt id / drive id / /uploads/xxx
+  duration                     Int? // seconds for video
+  totalPages                   Int? // for PDF
+  archived                     Boolean   @default(false)
+  requireCompletionForDownload Boolean   @default(false)
+  availableFrom                DateTime?
+  order                        Int       @default(0)
+  contentOrder                 Int       @default(0)
+  externalId                   String?   @unique
+  createdAt                    DateTime  @default(now())
 
   downloads     MaterialDownload[]
   videoProgress VideoProgress[]
@@ -98,10 +133,10 @@ model Material {
 }
 
 model Enrollment {
-  userId   String
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  courseId String
-  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId   String
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   enrolledAt DateTime @default(now())
 
   @@id([userId, courseId])
@@ -110,11 +145,11 @@ model Enrollment {
 
 // ponytail: 1 row per user+material, upsert is cheaper than event stream
 model MaterialDownload {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  materialId String
-  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  materialId   String
+  material     Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
   downloadedAt DateTime @default(now())
 
   @@index([userId, materialId])
@@ -148,31 +183,31 @@ model SlideProgress {
 }
 
 model Quiz {
-  id           String   @id @default(cuid())
-  courseId     String?
-  course       Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  moduleId     String?
-  module       Module?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  title        String
-  kind         String   @default("QUIZ") // QUIZ | PRETEST | POSTTEST
-  passingScore Int      @default(60)
-  timeLimit    Int? // minutes, null = no limit
-  timerMode    String   @default("INDEPENDENT") // INDEPENDENT | SYNC_DEADLINE
-  attemptLimit Int      @default(1)
-  showAnswers  Boolean  @default(false)
-  randomizeQuestions Boolean @default(false)
-  randomizeOptions Boolean @default(false)
-  questionCount Int?
-  resultReleaseMode String @default("HIDDEN") // HIDDEN | MANUAL | SCHEDULED
-  resultReleaseAt DateTime?
-  resultPublishedAt DateTime?
+  id                  String    @id @default(cuid())
+  courseId            String?
+  course              Course?   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  moduleId            String?
+  module              Module?   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title               String
+  kind                String    @default("QUIZ") // QUIZ | PRETEST | POSTTEST
+  passingScore        Int       @default(60)
+  timeLimit           Int? // minutes, null = no limit
+  timerMode           String    @default("INDEPENDENT") // INDEPENDENT | SYNC_DEADLINE
+  attemptLimit        Int       @default(1)
+  showAnswers         Boolean   @default(false)
+  randomizeQuestions  Boolean   @default(false)
+  randomizeOptions    Boolean   @default(false)
+  questionCount       Int?
+  resultReleaseMode   String    @default("HIDDEN") // HIDDEN | MANUAL | SCHEDULED
+  resultReleaseAt     DateTime?
+  resultPublishedAt   DateTime?
   resultPublishedById String?
-  deadline     DateTime?
-  availableFrom DateTime?
-  archived     Boolean  @default(false)
-  order        Int      @default(0)
-  contentOrder Int      @default(0)
-  createdAt    DateTime @default(now())
+  deadline            DateTime?
+  availableFrom       DateTime?
+  archived            Boolean   @default(false)
+  order               Int       @default(0)
+  contentOrder        Int       @default(0)
+  createdAt           DateTime  @default(now())
 
   questions Question[]
   attempts  QuizAttempt[]
@@ -182,20 +217,20 @@ model Quiz {
 }
 
 model Assignment {
-  id          String   @id @default(cuid())
-  courseId    String
-  course      Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  moduleId    String?
-  module      Module? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  title       String
-  description String?
-  deadline    DateTime?
+  id            String                 @id @default(cuid())
+  courseId      String
+  course        Course                 @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  moduleId      String?
+  module        Module?                @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  deadline      DateTime?
   availableFrom DateTime?
-  archived    Boolean  @default(false)
-  order       Int      @default(0)
-  contentOrder Int      @default(0)
-  createdAt   DateTime @default(now())
-  submissions AssignmentSubmission[]
+  archived      Boolean                @default(false)
+  order         Int                    @default(0)
+  contentOrder  Int                    @default(0)
+  createdAt     DateTime               @default(now())
+  submissions   AssignmentSubmission[]
 
   @@index([courseId])
   @@index([moduleId])
@@ -224,15 +259,15 @@ model AssignmentSubmission {
 }
 
 model Question {
-  id           String @id @default(cuid())
+  id           String            @id @default(cuid())
   quizId       String
-  quiz         Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  order        Int    @default(0)
+  quiz         Quiz              @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  order        Int               @default(0)
   text         String
-  type         String @default("MULTIPLE_CHOICE") // MULTIPLE_CHOICE | ESSAY
-  options      String @default("[]") // JSON stringify options for sqlite compat
+  type         String            @default("MULTIPLE_CHOICE") // MULTIPLE_CHOICE | ESSAY
+  options      String            @default("[]") // JSON stringify options for sqlite compat
   correctIndex Int?
-  points       Int    @default(10)
+  points       Int               @default(10)
   imageUrl     String?
   answerGrades QuizAnswerGrade[]
 
@@ -240,17 +275,17 @@ model Question {
 }
 
 model QuizAttempt {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  quizId      String
-  quiz        Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  score       Float     @default(0)
-  passed      Boolean   @default(false)
-  answers     String    @default("[]") // JSON stringify [{questionId, chosen}]
-  startedAt   DateTime  @default(now())
-  expiresAt   DateTime?
-  submittedAt DateTime?
+  id           String            @id @default(cuid())
+  userId       String
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizId       String
+  quiz         Quiz              @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  score        Float             @default(0)
+  passed       Boolean           @default(false)
+  answers      String            @default("[]") // JSON stringify [{questionId, chosen}]
+  startedAt    DateTime          @default(now())
+  expiresAt    DateTime?
+  submittedAt  DateTime?
   answerGrades QuizAnswerGrade[]
 
   @@index([userId, quizId])
@@ -258,16 +293,16 @@ model QuizAttempt {
 }
 
 model QuizAnswerGrade {
-  id         String @id @default(cuid())
+  id         String      @id @default(cuid())
   attemptId  String
   attempt    QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
   questionId String
-  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  question   Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
   graderId   String
-  grader     User @relation(fields: [graderId], references: [id], onDelete: Cascade)
+  grader     User        @relation(fields: [graderId], references: [id], onDelete: Cascade)
   score      Float
   feedback   String?
-  gradedAt   DateTime @default(now())
+  gradedAt   DateTime    @default(now())
 
   @@unique([attemptId, questionId])
   @@index([questionId])

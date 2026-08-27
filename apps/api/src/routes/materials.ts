@@ -5,6 +5,8 @@ import multer from "multer";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { CreateMaterialSchema } from "@repo/shared";
+import { denyIfNoCourseAccess } from "../lib/courseAccess.js";
+import { notifyCourseStudents } from "../lib/notifications.js";
 const r = Router();
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -26,9 +28,12 @@ const storage = multer.diskStorage({
   filename: (_req,file,cb)=>cb(null, Date.now()+"-"+file.originalname.replace(/\s+/g,"_"))
 });
 const upload = multer({ storage, limits:{ fileSize: 500*1024*1024 } });
+r.use("/:id", requireAuth as any, async (req: any, res, next) => { const material = await prisma.material.findUnique({ where: { id: req.params.id }, select: { module: { select: { courseId: true } } } }); if (material?.module && await denyIfNoCourseAccess(req.user, material.module.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." }); next(); });
 
 // create material
 r.post("/", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
+  const moduleAccess = await prisma.module.findUnique({ where: { id: req.body.moduleId }, select: { courseId: true } });
+  if (!moduleAccess || await denyIfNoCourseAccess((req as any).user, moduleAccess.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   const moduleCheck = await prisma.module.findUnique({ where: { id: req.body.moduleId }, select: { type: true } });
   if (moduleCheck?.type === "UTS" || moduleCheck?.type === "UAS") return res.status(400).json({ message: "Modul UTS/UAS hanya dapat berisi quiz dan bank soal." });
   const parsed = CreateMaterialSchema.safeParse(req.body);
@@ -36,6 +41,7 @@ r.post("/", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,
   const last = await prisma.material.findFirst({ where: { moduleId: parsed.data.moduleId }, orderBy: { order: "desc" } });
   const [assignmentContent, materialContent, quizContent] = await Promise.all([prisma.assignment.findFirst({ where: { moduleId: parsed.data.moduleId }, orderBy: { contentOrder: "desc" } }), prisma.material.findFirst({ where: { moduleId: parsed.data.moduleId }, orderBy: { contentOrder: "desc" } }), prisma.quiz.findFirst({ where: { moduleId: parsed.data.moduleId }, orderBy: { contentOrder: "desc" } })]);
   const m = await prisma.material.create({ data: { ...parsed.data, availableFrom: parsed.data.availableFrom ? new Date(parsed.data.availableFrom) : null, order: (last?.order ?? 0) + 1, contentOrder: Math.max(assignmentContent?.contentOrder ?? 0, materialContent?.contentOrder ?? 0, quizContent?.contentOrder ?? 0) + 1 } });
+  void notifyCourseStudents(moduleAccess.courseId, "MATERIAL_CREATED", "Materi baru", `Materi ${m.title} tersedia.`, `material:${m.id}:created`, `/material/${m.id}`);
   res.status(201).json(m);
 });
 
@@ -44,6 +50,8 @@ r.post("/upload", requireAuth as any, requireRole("ADMIN","DOSEN") as any, uploa
   if(!req.file) return res.status(400).json({message:"file required"});
   const { moduleId, title, type } = req.body;
   if(!moduleId || !title || !type) return res.status(400).json({message:"moduleId, title, type required"});
+  const moduleAccess = await prisma.module.findUnique({ where: { id: moduleId }, select: { courseId: true } });
+  if (!moduleAccess || await denyIfNoCourseAccess(req.user, moduleAccess.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   const moduleCheck = await prisma.module.findUnique({ where: { id: moduleId }, select: { type: true } });
   if (moduleCheck?.type === "UTS" || moduleCheck?.type === "UAS") return res.status(400).json({ message: "Modul UTS/UAS hanya dapat berisi quiz dan bank soal." });
   const sourceUrl = `/uploads/${req.file.filename}`;
@@ -52,6 +60,7 @@ r.post("/upload", requireAuth as any, requireRole("ADMIN","DOSEN") as any, uploa
   const [assignmentContent, materialContent, quizContent] = await Promise.all([prisma.assignment.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } }), prisma.material.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } }), prisma.quiz.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } })]);
   try {
     const m = await prisma.material.create({ data:{ moduleId, title, type, sourceType:"upload", sourceUrl, availableFrom: req.body.availableFrom ? new Date(req.body.availableFrom) : null, order: (last?.order ?? 0) + 1, contentOrder: Math.max(assignmentContent?.contentOrder ?? 0, materialContent?.contentOrder ?? 0, quizContent?.contentOrder ?? 0) + 1, totalPages, duration: type==="VIDEO"? Number(req.body.duration||0): undefined } });
+    void notifyCourseStudents(moduleAccess.courseId, "MATERIAL_CREATED", "Materi baru", `Materi ${m.title} tersedia.`, `material:${m.id}:created`, `/material/${m.id}`);
     res.status(201).json(m);
   } catch (error) {
     await removeMaterialFileIfUnused(sourceUrl);

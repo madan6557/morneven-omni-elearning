@@ -4,20 +4,31 @@ import { prisma } from "../lib/prisma.js";
 import { signToken } from "../lib/jwt.js";
 import { ChangePasswordSchema, LoginSchema, RegisterSchema } from "@repo/shared";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+import { audit } from "../lib/audit.js";
 const r = Router();
+const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+const clientKey = (req: any) => String(req.ip || req.headers["x-forwarded-for"] || "unknown");
+const cookieSuffix = process.env.NODE_ENV === "production" ? "SameSite=None; Secure" : "SameSite=Lax";
+const setSessionCookie = (res: any, token: string) => res.setHeader("Set-Cookie", `omni_session=${token}; HttpOnly; Path=/; Max-Age=604800; ${cookieSuffix}`);
+const clearSessionCookie = (res: any) => res.setHeader("Set-Cookie", `omni_session=; HttpOnly; Path=/; Max-Age=0; ${cookieSuffix}`);
 
 r.post("/login", async (req, res) => {
+  const key = clientKey(req); const now = Date.now(); const state = loginAttempts.get(key); if (state && state.resetAt > now && state.count >= 10) return res.status(429).json({ message: "Terlalu banyak percobaan login. Coba lagi beberapa menit." }); if (!state || state.resetAt <= now) loginAttempts.set(key, { count: 0, resetAt: now + 15 * 60 * 1000 });
   const parsed = LoginSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json(parsed.error);
   const { nim, password } = parsed.data;
   const user = await prisma.user.findUnique({ where: { nim } });
-  if (!user || !(await bcrypt.compare(password, user.password))) return res.status(401).json({ message: "NIM atau password salah" });
-  const token = signToken({ id: user.id, nim: user.nim, role: user.role });
+  if (!user || !user.isActive || !(await bcrypt.compare(password, user.password))) { const current = loginAttempts.get(key)!; current.count += 1; return res.status(401).json({ message: "NIM atau password salah" }); }
+  loginAttempts.delete(key);
+  const token = signToken({ id: user.id, nim: user.nim, role: user.role, tokenVersion: user.tokenVersion });
   await prisma.user.update({ where: { id: user.id }, data: { lastSeenAt: new Date() } });
+  void audit(user.id, "LOGIN", "User", user.id);
+  setSessionCookie(res, token);
   res.json({ token, user: { id: user.id, nim: user.nim, name: user.name, role: user.role } });
 });
 
 r.post("/register", async (req, res) => {
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_PUBLIC_REGISTER !== "true") return res.status(403).json({ message: "Pendaftaran akun dilakukan oleh admin." });
   const parsed = RegisterSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json(parsed.error);
   const { nim, name, password, role } = parsed.data;
@@ -35,8 +46,11 @@ r.post("/users", requireAuth as any, requireRole("ADMIN") as any, async (req, re
   if (await prisma.user.findUnique({ where: { nim } })) return res.status(409).json({ message: "NIM sudah terdaftar" });
   const hash = await bcrypt.hash(password, 10);
   const user = await prisma.user.create({ data: { nim, name, password: hash, role } });
+  void audit((req as any).user?.id, "CREATE", "User", user.id, { role });
   res.status(201).json(user);
 });
+
+r.post("/logout", requireAuth as any, (_req, res) => { clearSessionCookie(res); res.json({ ok: true }); });
 
 r.get("/me", requireAuth as any, async (req: any, res) => {
   const u = await prisma.user.findUnique({ where: { id: req.user.id }, select: { id: true, nim: true, name: true, role: true } });
@@ -67,14 +81,17 @@ r.patch("/users/:id/password", requireAuth as any, requireRole("ADMIN") as any, 
   if (!parsed.success) return res.status(400).json({ message: "Password minimal 6 karakter." });
   const user = await prisma.user.findUnique({ where: { id: req.params.id }, select: { id: true } });
   if (!user) return res.status(404).json({ message: "User tidak ditemukan." });
-  await prisma.user.update({ where: { id: user.id }, data: { password: await bcrypt.hash(parsed.data.password, 10) } });
+  await prisma.user.update({ where: { id: user.id }, data: { password: await bcrypt.hash(parsed.data.password, 10), tokenVersion: { increment: 1 } } });
+  void audit(req.user.id, "RESET_PASSWORD", "User", user.id);
   res.json({ ok: true, message: "Password user berhasil diubah." });
 });
 
 r.patch("/me/password", requireAuth as any, async (req: any, res) => {
   const parsed = ChangePasswordSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: "Password minimal 6 karakter." });
-  await prisma.user.update({ where: { id: req.user.id }, data: { password: await bcrypt.hash(parsed.data.password, 10) } });
+  const user = await prisma.user.update({ where: { id: req.user.id }, data: { password: await bcrypt.hash(parsed.data.password, 10), tokenVersion: { increment: 1 } }, select: { id: true, nim: true, role: true, tokenVersion: true } });
+  setSessionCookie(res, signToken({ id: user.id, nim: user.nim, role: user.role, tokenVersion: user.tokenVersion }));
+  void audit(req.user.id, "CHANGE_PASSWORD", "User", req.user.id);
   res.json({ ok: true, message: "Password Anda berhasil diubah." });
 });
 
@@ -85,12 +102,12 @@ r.put("/users/:id", requireAuth as any, requireRole("ADMIN") as any, async (req:
   if (nim.length < 3 || name.length < 2 || !["ADMIN", "DOSEN", "MAHASISWA"].includes(role)) return res.status(400).json({ message: "Data user tidak valid." });
   const existing = await prisma.user.findFirst({ where: { nim, NOT: { id: req.params.id } }, select: { id: true } });
   if (existing) return res.status(409).json({ message: "NIM/identifier sudah digunakan." });
-  try { const user = await prisma.user.update({ where: { id: req.params.id }, data: { nim, name, role }, select: { id: true, nim: true, name: true, role: true, lastSeenAt: true } }); res.json(user); } catch { res.status(404).json({ message: "User tidak ditemukan." }); }
+  try { const user = await prisma.user.update({ where: { id: req.params.id }, data: { nim, name, role }, select: { id: true, nim: true, name: true, role: true, lastSeenAt: true } }); void audit(req.user.id, "UPDATE", "User", user.id, { role }); res.json(user); } catch { res.status(404).json({ message: "User tidak ditemukan." }); }
 });
 
 r.delete("/users/:id", requireAuth as any, requireRole("ADMIN") as any, async (req: any, res) => {
   if (req.params.id === req.user.id) return res.status(400).json({ message: "Akun yang sedang digunakan tidak dapat dihapus." });
-  try { await prisma.user.delete({ where: { id: req.params.id } }); res.json({ ok: true }); } catch { res.status(404).json({ message: "User tidak ditemukan." }); }
+  try { await prisma.user.delete({ where: { id: req.params.id } }); void audit(req.user.id, "DELETE", "User", req.params.id); res.json({ ok: true }); } catch { res.status(404).json({ message: "User tidak ditemukan." }); }
 });
 
 export default r;

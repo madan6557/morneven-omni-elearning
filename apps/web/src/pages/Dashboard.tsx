@@ -8,18 +8,17 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [courses, setCourses] = useState<any[]>([]);
   const [rekap, setRekap] = useState<any>(null);
+  const [courseProgress, setCourseProgress] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (!user) return;
-    api.get("/api/courses").then((r) => setCourses(r.data)).catch(() => {});
     api.get("/api/courses").then(async (r) => {
-      if (r.data[0] && user.role === "MAHASISWA") {
-        try {
-          const progress = await api.get(`/api/progress/course/${r.data[0].id}`);
-          setRekap(progress.data);
-        } catch {}
-      }
-    });
+      setCourses(r.data || []);
+      if (user.role !== "MAHASISWA") return;
+      const progress = await Promise.all((r.data || []).map((course: any) => api.get(`/api/progress/course/${course.id}`).then((response) => ({ courseId: course.id, data: response.data })).catch(() => null)));
+      setRekap({ videos: progress.flatMap((item: any) => item?.data?.videos || []), attempts: progress.flatMap((item: any) => item?.data?.attempts || []) });
+      setCourseProgress(Object.fromEntries(progress.filter(Boolean).map((item: any) => [item.courseId, item.data.courseProgress?.overall || 0])));
+    }).catch(() => {});
   }, [user]);
 
   if (!user) return null;
@@ -59,7 +58,7 @@ export default function Dashboard() {
           <div><p className="eyebrow">Learning library</p><h2 className="mt-1 text-xl font-bold tracking-tight">Mata kuliah pilihan</h2></div>
           <Link to="/courses" className="text-sm font-semibold text-violet-700 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-200">Lihat semua</Link>
         </div>
-        {courses.length === 0 && <div className="section-card text-sm text-zinc-500 dark:text-zinc-400">Belum ada mata kuliah. {user.role !== "MAHASISWA" && "Buat mata kuliah melalui Kelola Materi."}</div>}
+        {courses.length === 0 && <div className="section-card text-sm text-zinc-500 dark:text-zinc-400">Belum ada mata kuliah. {user.role === "ADMIN" && "Buat mata kuliah melalui Kelola Materi."}{user.role === "DOSEN" && "Menunggu assignment dosen dari admin."}{user.role === "MAHASISWA" && "Menunggu enrollment dari admin atau dosen."}</div>}
         <div className="grid gap-4 md:grid-cols-2">
           {courses.map((c) => (
             <Link key={c.id} to={`/courses/${c.id}`} className="group section-card relative overflow-hidden transition duration-200 hover:-translate-y-1 hover:shadow-[0_24px_50px_rgba(46,31,73,0.12)]">
@@ -68,8 +67,8 @@ export default function Dashboard() {
                 <div className="flex items-start justify-between gap-4"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-200"><BookOpen size={18} /></span><ArrowUpRight size={18} className="text-zinc-300 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-violet-600" /></div>
                 <h3 className="mt-5 font-semibold tracking-tight">{c.title}</h3>
                 <p className="mt-2 line-clamp-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">{c.description || "Materi pembelajaran terstruktur untuk mendukung progres akademikmu."}</p>
-                <div className="mt-5 flex flex-wrap gap-2 text-xs font-medium text-zinc-500 dark:text-zinc-400"><span className="rounded-full bg-zinc-100 px-2.5 py-1 dark:bg-zinc-800">{c.modules?.length || 0} modul</span><span className="rounded-full bg-zinc-100 px-2.5 py-1 dark:bg-zinc-800">{c.modules?.flatMap((m: any) => m.materials)?.length || 0} materi</span><span className="rounded-full bg-zinc-100 px-2.5 py-1 dark:bg-zinc-800">{c.enrolledCount || 0} mahasiswa</span></div>
-                <div className="mt-5 flex items-center gap-3"><div className="progress flex-1"><div style={{ width: `${Math.min(100, (c.modules?.length || 0) * 20)}%` }} /></div><span className="text-xs font-semibold text-violet-700 dark:text-violet-300">Mulai</span></div>
+                <div className="mt-5 flex flex-wrap gap-2 text-xs font-medium text-zinc-500 dark:text-zinc-400"><span className="rounded-full bg-zinc-100 px-2.5 py-1 dark:bg-zinc-800">{c.moduleCount || 0} modul</span><span className="rounded-full bg-zinc-100 px-2.5 py-1 dark:bg-zinc-800">{c.materialCount || 0} materi</span><span className="rounded-full bg-zinc-100 px-2.5 py-1 dark:bg-zinc-800">{c.enrolledCount || 0} mahasiswa</span></div>
+                <div className="mt-5 flex items-center gap-3"><div className="progress flex-1"><div style={{ width: `${courseProgress[c.id] || 0}%` }} /></div><span className="text-xs font-semibold text-violet-700 dark:text-violet-300">{user.role === "MAHASISWA" ? `${courseProgress[c.id] || 0}% selesai` : "Kelola"}</span></div>
               </div>
             </Link>
           ))}

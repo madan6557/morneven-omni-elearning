@@ -15,6 +15,8 @@ import {
   Users,
   HelpCircle,
   KeyRound,
+  Bell,
+  CalendarDays,
 } from "lucide-react";
 
 class RouteErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
@@ -59,6 +61,8 @@ export default function Layout({ children }: { children: any }) {
     { to: "/users", label: "Kelola User", icon: Users, show: isAdmin },
     { to: "/manage", label: "Kelola Materi & Quiz", icon: Settings2, show: isDosen || isAdmin },
     { to: "/help", label: "Help / Panduan", icon: HelpCircle, show: true },
+    { to: "/calendar", label: "Kalender", icon: CalendarDays, show: true },
+    { to: "/notifications", label: "Notifikasi", icon: Bell, show: true },
   ];
 
   const visibleItems = navItems.filter((item) => item.show);

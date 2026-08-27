@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import path from "path";
+import fs from "fs";
 import { auth } from "./middleware/auth.js";
 import authRoutes from "./routes/auth.js";
 import courseRoutes from "./routes/courses.js";
@@ -9,6 +10,10 @@ import progressRoutes from "./routes/progress.js";
 import quizRoutes from "./routes/quizzes.js";
 import assignmentRoutes from "./routes/assignments.js";
 import backupRoutes from "./routes/backup.js";
+import notificationRoutes from "./routes/notifications.js";
+import calendarRoutes from "./routes/calendar.js";
+import reportRoutes from "./routes/reports.js";
+import { prisma } from "./lib/prisma.js";
 
 export function createApp() {
   const app = express();
@@ -24,7 +29,7 @@ export function createApp() {
   const uploadDir = process.env.UPLOAD_DIR || "./uploads";
   app.use("/uploads", express.static(path.resolve(uploadDir)));
 
-  app.get("/api/health", (_req,res)=>res.json({ ok:true, time: new Date().toISOString() }));
+  app.get("/api/health", async (_req, res) => { const checks: any = { api: true, database: false, storage: false }; try { await prisma.$queryRaw`SELECT 1`; checks.database = true; } catch {} try { checks.storage = fs.existsSync(path.resolve(uploadDir)); } catch {} const ok = checks.database && checks.storage; res.status(ok ? 200 : 503).json({ ok, checks, time: new Date().toISOString() }); });
 
   app.use("/api/auth", authRoutes);
   app.use("/api/courses", courseRoutes);
@@ -33,8 +38,12 @@ export function createApp() {
   app.use("/api/quizzes", quizRoutes);
   app.use("/api/assignments", assignmentRoutes);
   app.use("/api/backup", backupRoutes);
+  app.use("/api/notifications", notificationRoutes);
+  app.use("/api/calendar", calendarRoutes);
+  app.use("/api/reports", reportRoutes);
   // integration sso stub — ponytail: verify JWT shared secret
   app.post("/api/integration/auth/sso", async (req,res)=>{
+    if (process.env.NODE_ENV === "production" && req.headers["x-api-key"] !== process.env.API_KEY) return res.status(401).json({ message: "Invalid API key" });
     const { token } = req.body;
     if(!token) return res.status(400).json({message:"token required"});
     try{
@@ -50,8 +59,8 @@ export function createApp() {
   app.use((_req,res)=>res.status(404).json({message:"Not found"}));
   // error
   app.use((err:any,_req:any,res:any,_next:any)=>{
-    console.error(err);
-    res.status(500).json({message: err.message||"Internal error"});
+    console.error(JSON.stringify({ name: err?.name, message: err?.message, stack: process.env.NODE_ENV === "production" ? undefined : err?.stack }));
+    res.status(500).json({message: process.env.NODE_ENV === "production" ? "Terjadi kesalahan internal." : err?.message || "Internal error"});
   });
   return app;
 }

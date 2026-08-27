@@ -4,6 +4,8 @@ import path from "path";
 import fs from "fs";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+import { denyIfNoCourseAccess } from "../lib/courseAccess.js";
+import { notifyCourseStudents, notifyUsers } from "../lib/notifications.js";
 
 const r = Router();
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
@@ -22,8 +24,10 @@ const safeUpload = (req: any, res: any, next: any) => upload.single("file")(req,
 const localFile = (url?: string | null) => url?.startsWith("/uploads/") ? path.resolve(uploadRoot, url.slice("/uploads/".length)) : null;
 const removeSubmissionFile = async (url?: string | null) => { const file = localFile(url); if (file && file.startsWith(`${uploadRoot}${path.sep}`) && fs.existsSync(file)) await fs.promises.unlink(file); };
 const orderItems = (moduleId: string) => prisma.assignment.findMany({ where: { moduleId }, orderBy: [{ order: "asc" }, { createdAt: "asc" }] });
+r.use("/:id", requireAuth as any, async (req: any, res, next) => { const assignment = await prisma.assignment.findUnique({ where: { id: req.params.id }, select: { courseId: true } }); if (assignment && await denyIfNoCourseAccess(req.user, assignment.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." }); next(); });
 
 r.get("/course/:courseId", requireAuth as any, async (req: any, res) => {
+  if (await denyIfNoCourseAccess(req.user, req.params.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   res.json(await prisma.assignment.findMany({ where: { courseId: req.params.courseId, ...(req.user.role === "MAHASISWA" ? { archived: false } : {}) }, include: { module: true }, orderBy: [{ order: "asc" }, { createdAt: "asc" }] }));
 });
 
@@ -32,12 +36,14 @@ r.get("/:id", requireAuth as any, async (req: any, res) => { const item = await 
 r.post("/", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (req: any, res) => {
   const { courseId, moduleId, title, description, availableFrom, deadline } = req.body;
   if (!courseId || !moduleId || !title?.trim()) return res.status(400).json({ message: "courseId, moduleId, dan title wajib diisi." });
+  if (await denyIfNoCourseAccess(req.user, courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   const module = await prisma.module.findFirst({ where: { id: moduleId, courseId } });
   if (!module) return res.status(400).json({ message: "Modul tidak berada pada matkul ini." });
   if (module.type === "UTS" || module.type === "UAS") return res.status(400).json({ message: "Modul UTS/UAS hanya dapat berisi quiz dan bank soal." });
   const [last, assignmentContent, materialContent, quizContent] = await Promise.all([prisma.assignment.findFirst({ where: { moduleId }, orderBy: { order: "desc" } }), prisma.assignment.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } }), prisma.material.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } }), prisma.quiz.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } })]);
   const contentOrder = Math.max(assignmentContent?.contentOrder ?? 0, materialContent?.contentOrder ?? 0, quizContent?.contentOrder ?? 0) + 1;
   const item = await prisma.assignment.create({ data: { courseId, moduleId, order: (last?.order ?? 0) + 1, contentOrder, title: title.trim(), description: description || null, availableFrom: availableFrom ? new Date(availableFrom) : null, deadline: deadline ? new Date(deadline) : null } });
+  void notifyCourseStudents(courseId, "ASSIGNMENT_CREATED", "Tugas baru", `Tugas ${item.title} tersedia.`, `assignment:${item.id}:created`, `/assignment/${item.id}`);
   res.status(201).json(item);
 });
 
@@ -78,15 +84,21 @@ r.get("/:id/submissions", requireAuth as any, requireRole("ADMIN", "DOSEN") as a
 });
 
 r.patch("/submissions/:submissionId", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (req, res) => {
+  const submission = await prisma.assignmentSubmission.findUnique({ where: { id: req.params.submissionId }, include: { assignment: { select: { courseId: true, title: true } } } });
+  if (!submission) return res.status(404).json({ message: "Pengumpulan tidak ditemukan." });
+  if (await denyIfNoCourseAccess((req as any).user, submission.assignment.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   const score = req.body.score === "" || req.body.score === null || req.body.score === undefined ? null : Number(req.body.score);
   if (score !== null && (!Number.isFinite(score) || score < 0 || score > 100)) return res.status(400).json({ message: "Nilai harus 0 sampai 100." });
   const item = await prisma.assignmentSubmission.update({ where: { id: req.params.submissionId }, data: { score, feedback: req.body.feedback || null, gradedAt: score === null ? null : new Date() } });
+  if (score !== null) void notifyUsers([submission.userId], "ASSIGNMENT_GRADED", "Tugas telah dinilai", `Tugas ${submission.assignment?.title || "Anda"} telah dinilai.`, `submission:${submission.id}:graded`, `/assignment/${submission.assignmentId}`);
   res.json(item);
 });
 
 r.delete("/submissions/:submissionId", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (req, res) => {
   const item = await prisma.assignmentSubmission.findUnique({ where: { id: req.params.submissionId } });
   if (!item) return res.status(404).json({ message: "Pengumpulan tidak ditemukan." });
+  const assignment = await prisma.assignment.findUnique({ where: { id: item.assignmentId }, select: { courseId: true } });
+  if (assignment && await denyIfNoCourseAccess((req as any).user, assignment.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   await prisma.assignmentSubmission.delete({ where: { id: item.id } });
   await removeSubmissionFile(item.fileUrl);
   res.json({ ok: true });

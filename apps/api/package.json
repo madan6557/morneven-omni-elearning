@@ -7,6 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc --noEmit",
     "start": "tsx src/server.ts",
+    "test": "node --import tsx --test test/*.test.ts",
     "postinstall": "prisma generate --schema=../../packages/db/prisma/schema.prisma",
     "migrate": "prisma migrate deploy --schema=../../packages/db/prisma/schema.prisma",
     "lint": "tsc --noEmit"

@@ -3,6 +3,9 @@ import path from "path";
 import fs from "fs";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+import { denyIfNoCourseAccess } from "../lib/courseAccess.js";
+import { audit } from "../lib/audit.js";
+import { notifyCourseStudents } from "../lib/notifications.js";
 const r = Router();
 const uploadRoot = path.resolve(process.env.UPLOAD_DIR || "./uploads");
 const removeLocalFileIfUnused = async (url: string | null | undefined, kind: "material" | "question") => {
@@ -33,22 +36,13 @@ function hideAnswerKeys(course: any) {
 r.get("/", requireAuth as any, async (req: any, res) => {
   const { role, id } = req.user;
   let courses;
-  if (role === "MAHASISWA") {
-    const enrolls = await prisma.enrollment.findMany({ where: { userId: id }, select: { courseId: true } });
-    const ids = enrolls.map((e:any) => e.courseId);
-  courses = await prisma.course.findMany({ where: { id: { "in": ids } }, include: { assignments: true, modules: { include: { materials: true, quizzes: true, assignments: true } }, instructors: { include: { user: { select: { id: true, nim: true, name: true } } } } } as any, orderBy: { createdAt: "desc" } });
-  } else {
-    courses = await prisma.course.findMany({ include: { assignments: true, modules: { include: { materials: true, quizzes: true, assignments: true } }, instructors: { include: { user: { select: { id: true, nim: true, name: true } } } } } as any, orderBy: { createdAt: "desc" } });
-  }
-  // add enrollment count
-  const withCount = await Promise.all(courses.map(async c => {
-    const count = await prisma.enrollment.count({ where: { courseId: c.id } });
-    return { ...c, enrolledCount: count };
-  }));
-  res.json(role === "MAHASISWA" ? withCount.map(hideAnswerKeys) : withCount);
+  const where = role === "ADMIN" ? {} : role === "DOSEN" ? { instructors: { some: { userId: id } } } : { enrollments: { some: { userId: id } } };
+  courses = await prisma.course.findMany({ where, select: { id: true, title: true, description: true, createdAt: true, modules: { orderBy: { order: "asc" }, select: { id: true, title: true, type: true, _count: { select: { materials: true, assignments: true, quizzes: true } } } }, _count: { select: { enrollments: true, instructors: true } } }, orderBy: { createdAt: "desc" } });
+  res.json(courses.map((course: any) => ({ ...course, enrolledCount: course._count.enrollments, moduleCount: course.modules.length, materialCount: course.modules.reduce((sum: number, module: any) => sum + module._count.materials, 0), assignmentCount: course.modules.reduce((sum: number, module: any) => sum + module._count.assignments, 0), quizCount: course.modules.reduce((sum: number, module: any) => sum + module._count.quizzes, 0), _count: undefined })));
 });
 
 r.get("/:id", requireAuth as any, async (req: any, res) => {
+  if (await denyIfNoCourseAccess(req.user, req.params.id)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   const c = await prisma.course.findUnique({
     where: { id: req.params.id },
     include: { assignments: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] }, modules: { orderBy: { order: "asc" }, include: { materials: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] }, quizzes: { orderBy: [{ order: "asc" }, { createdAt: "asc" }], include: { questions: { orderBy: { order: "asc" } } } }, assignments: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] } } }, instructors: { include: { user: { select: { id: true, nim: true, name: true } } } } } as any
@@ -57,22 +51,27 @@ r.get("/:id", requireAuth as any, async (req: any, res) => {
   res.json(req.user.role === "MAHASISWA" ? hideAnswerKeys(c) : c);
 });
 
-r.post("/", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
+r.post("/", requireAuth as any, requireRole("ADMIN") as any, async (req, res) => {
   const { title, description } = req.body;
   if (!title) return res.status(400).json({ message: "title required" });
   const c = await prisma.course.create({ data: { title, description } });
+  void audit((req as any).user.id, "CREATE", "Course", c.id);
   res.status(201).json(c);
 });
 
 r.put("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
+  if (await denyIfNoCourseAccess((req as any).user, req.params.id)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   const c = await prisma.course.update({ where: { id: req.params.id }, data: req.body });
+  void audit((req as any).user.id, "UPDATE", "Course", c.id);
   res.json(c);
 });
 
 r.delete("/:id", requireAuth as any, requireRole("ADMIN") as any, async (req, res) => { const course = await prisma.course.findUnique({ where: { id: req.params.id }, include: { modules: { include: { materials: true, quizzes: { include: { questions: true } } } } } }); if (!course) return res.status(404).json({ message: "Mata kuliah tidak ditemukan." }); await prisma.course.delete({ where: { id: req.params.id } }); const files = course.modules.flatMap((module) => [...module.materials.map((item) => ({ url: item.sourceUrl, kind: "material" as const })), ...module.quizzes.flatMap((quiz) => quiz.questions.map((question) => ({ url: question.imageUrl, kind: "question" as const })))]); await Promise.all(files.map((file) => removeLocalFileIfUnused(file.url, file.kind))); res.json({ ok: true }); });
 
 // modules
+r.use("/modules/:id", requireAuth as any, async (req: any, res, next) => { const module = await prisma.module.findUnique({ where: { id: req.params.id }, select: { courseId: true } }); if (!module) return res.status(404).json({ message: "Modul tidak ditemukan." }); if (await denyIfNoCourseAccess(req.user, module.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." }); next(); });
 r.post("/:courseId/modules", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
+  if (await denyIfNoCourseAccess((req as any).user, req.params.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   const { title, order, type = "REGULAR" } = req.body;
   if (!title?.trim() || !["REGULAR", "UTS", "UAS"].includes(type)) return res.status(400).json({ message: "Judul dan tipe modul tidak valid." });
   const m = await prisma.module.create({ data: { courseId: req.params.courseId, title: title.trim(), type, order: order ?? 0 } });
@@ -80,6 +79,9 @@ r.post("/:courseId/modules", requireAuth as any, requireRole("ADMIN","DOSEN") as
 });
 
 r.put("/modules/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
+  const existing = await prisma.module.findUnique({ where: { id: req.params.id }, select: { courseId: true } });
+  if (!existing) return res.status(404).json({ message: "Modul tidak ditemukan." });
+  if (await denyIfNoCourseAccess((req as any).user, existing.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   const data = { ...(req.body.title !== undefined ? { title: String(req.body.title).trim() } : {}), ...(req.body.type !== undefined && ["REGULAR", "UTS", "UAS"].includes(req.body.type) ? { type: req.body.type } : {}) };
   const m = await prisma.module.update({ where: { id: req.params.id }, data });
   res.json(m);
@@ -88,6 +90,7 @@ r.put("/modules/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, a
 r.patch("/modules/:id/reorder", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (req: any, res) => {
   const current = await prisma.module.findUnique({ where: { id: req.params.id } });
   if (!current) return res.status(404).json({ message: "Modul tidak ditemukan." });
+  if (await denyIfNoCourseAccess(req.user, current.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   const items = await prisma.module.findMany({ where: { courseId: current.courseId }, orderBy: [{ order: "asc" }, { createdAt: "asc" }] });
   const index = items.findIndex((item) => item.id === current.id); const target = index + (req.body.direction === "up" ? -1 : 1);
   if (target < 0 || target >= items.length) return res.json(current);
@@ -100,6 +103,7 @@ r.patch("/modules/:moduleId/content/reorder", requireAuth as any, requireRole("A
   if (!["assignment", "material", "quiz"].includes(itemType) || !["up", "down"].includes(direction) || !itemId) return res.status(400).json({ message: "itemType, itemId, dan direction tidak valid." });
   const module = await prisma.module.findUnique({ where: { id: req.params.moduleId } });
   if (!module) return res.status(404).json({ message: "Modul tidak ditemukan." });
+  if (await denyIfNoCourseAccess(req.user, module.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   const [assignments, materials, quizzes] = await Promise.all([
     prisma.assignment.findMany({ where: { moduleId: module.id } }),
     prisma.material.findMany({ where: { moduleId: module.id } }),
@@ -131,6 +135,7 @@ r.delete("/modules/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any
 
 // course instructors — one course may have multiple dosen
 r.get("/:id/instructors", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
+  if (await denyIfNoCourseAccess((req as any).user, req.params.id)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   const instructors = await prisma.courseInstructor.findMany({ where: { courseId: req.params.id }, include: { user: { select: { id: true, nim: true, name: true, role: true } } } });
   res.json(instructors.map((item: any) => item.user));
 });
@@ -142,31 +147,36 @@ r.put("/:id/instructors", requireAuth as any, requireRole("ADMIN") as any, async
     prisma.courseInstructor.deleteMany({ where: { courseId: req.params.id } }),
     ...users.map((user) => prisma.courseInstructor.create({ data: { courseId: req.params.id, userId: user.id } }))
   ]);
+  void audit((req as any).user.id, "ASSIGN_INSTRUCTORS", "Course", req.params.id, { count: users.length });
   res.json({ ok: true, userIds: users.map((user) => user.id) });
 });
 
 // enrollment
-r.post("/:id/enroll", requireAuth as any, async (req: any, res) => {
+r.post("/:id/enroll", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (req: any, res) => {
   const { userId } = req.body;
-  const uid = userId || req.user.id;
-  // only admin/dosen can enroll others
-  if (uid !== req.user.id && !["ADMIN","DOSEN"].includes(req.user.role)) return res.status(403).json({ message: "Forbidden" });
+  const uid = userId;
+  if (!uid) return res.status(400).json({ message: "userId wajib diisi." });
+  if (await denyIfNoCourseAccess(req.user, req.params.id)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   const e = await prisma.enrollment.upsert({ where: { userId_courseId: { userId: uid, courseId: req.params.id } }, update: {}, create: { userId: uid, courseId: req.params.id } });
+  void audit(req.user.id, "ENROLL", "Course", req.params.id, { userId: uid });
   res.json(e);
 });
 
 r.get("/:id/enrollments", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
+  if (await denyIfNoCourseAccess((req as any).user, req.params.id)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   const en = await prisma.enrollment.findMany({ where: { courseId: req.params.id }, include: { user: { select: { id: true, nim: true, name: true, role: true } } } });
   res.json(en);
 });
 
 r.put("/:id/enrollments", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
+  if (await denyIfNoCourseAccess((req as any).user, req.params.id)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   const userIds = Array.isArray(req.body.userIds) ? req.body.userIds : [];
   const students = await prisma.user.findMany({ where: { id: { in: userIds }, role: "MAHASISWA" }, select: { id: true } });
   await prisma.$transaction([
     prisma.enrollment.deleteMany({ where: { courseId: req.params.id } }),
     ...students.map((student) => prisma.enrollment.create({ data: { courseId: req.params.id, userId: student.id } }))
   ]);
+  void audit((req as any).user.id, "REPLACE_ENROLLMENTS", "Course", req.params.id, { count: students.length });
   res.json({ ok: true, userIds: students.map((student) => student.id) });
 });
 

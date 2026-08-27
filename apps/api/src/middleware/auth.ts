@@ -1,14 +1,18 @@
 import { Request, Response, NextFunction } from "express";
 import { verifyToken } from "../lib/jwt.js";
 import { prisma } from "../lib/prisma.js";
-export interface AuthUser { id: string; nim: string; role: string; }
-export function auth(req: Request & { user?: AuthUser }, _res: Response, next: NextFunction) {
+export interface AuthUser { id: string; nim: string; role: string; tokenVersion?: number; }
+const cookieToken = (header?: string) => header?.split(";").map((part) => part.trim()).find((part) => part.startsWith("omni_session="))?.slice("omni_session=".length);
+export async function auth(req: Request & { user?: AuthUser }, _res: Response, next: NextFunction) {
   const h = req.headers.authorization;
-  if (!h?.startsWith("Bearer ")) return next();
+  const token = h?.startsWith("Bearer ") ? h.slice(7) : cookieToken(req.headers.cookie);
+  if (!token) return next();
   try {
-    const token = h.slice(7);
-    req.user = verifyToken(token);
-    void prisma.user.update({ where: { id: req.user.id }, data: { lastSeenAt: new Date() } }).catch(() => undefined);
+    const payload = verifyToken(token);
+    const user = await prisma.user.findUnique({ where: { id: payload.id }, select: { id: true, nim: true, role: true, isActive: true, tokenVersion: true, lastSeenAt: true } });
+    if (!user || !user.isActive || (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion)) return next();
+    req.user = { id: user.id, nim: user.nim, role: user.role, tokenVersion: user.tokenVersion };
+    if (!user.lastSeenAt || Date.now() - user.lastSeenAt.getTime() > 60_000) void prisma.user.update({ where: { id: user.id }, data: { lastSeenAt: new Date() } }).catch(() => undefined);
   } catch {}
   next();
 }
