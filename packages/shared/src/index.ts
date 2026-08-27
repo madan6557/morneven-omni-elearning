@@ -51,7 +51,7 @@ export const CreateQuizSchema = z.object({
 export const ModuleTypeSchema = z.enum(["REGULAR", "UTS", "UAS"]);
 
 export const SubmitQuizSchema = z.object({
-  answers: z.array(z.object({ questionId: z.string(), chosen: z.number().optional(), answerText: z.string().optional() }))
+  answers: z.array(z.object({ questionId: z.string().min(1), chosen: z.number().int().min(-1).optional(), answerText: z.string().max(10000).optional() }).refine((answer) => answer.chosen !== undefined || answer.answerText !== undefined, "Jawaban wajib diisi"))
 });
 export type SubmitQuizDTO = z.infer<typeof SubmitQuizSchema>;
 

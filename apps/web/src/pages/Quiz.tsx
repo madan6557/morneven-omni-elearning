@@ -14,6 +14,7 @@ export default function Quiz(){
   const [attempts,setAttempts]=useState<any[]>([]);
   const { showFeedback, requestConfirmation } = useFeedback();
   const [submitting,setSubmitting]=useState(false);
+  const [error,setError]=useState("");
   useEffect(()=>{
     api.get(`/api/quizzes/${id}`).then(r=>setQ(r.data)).catch(()=>{});
     api.get(`/api/quizzes/${id}/attempts`).then(r=>setAttempts(r.data)).catch(()=>{});
@@ -23,14 +24,15 @@ export default function Quiz(){
     if (!(await requestConfirmation("Jawaban akan dikirim dan tidak dapat diubah setelah dikirim."))) return;
     if (submitting) return;
     setSubmitting(true);
+    setError("");
     try {
       const payload = { answers: q.questions.map((qq:any)=> qq.type === "ESSAY" ? ({ questionId: qq.id, answerText: String(answers[qq.id] || "") }) : ({ questionId: qq.id, chosen: Number(answers[qq.id] ?? -1) })) };
-      try{ await api.post(`/api/quizzes/${id}/start`); }catch{}
+      await api.post(`/api/quizzes/${id}/start`);
       const r=await api.post(`/api/quizzes/${id}/submit`, payload);
       setResult(r.data);
       const at=await api.get(`/api/quizzes/${id}/attempts`); setAttempts(at.data);
       showFeedback("Jawaban berhasil dikirim.");
-    } catch { showFeedback("Jawaban gagal dikirim.", "error"); }
+    } catch (error: any) { const message = error.response?.data?.message || "Jawaban gagal dikirim."; setError(message); showFeedback(message, "error"); }
     finally { setSubmitting(false); }
   };
   return (
@@ -39,6 +41,7 @@ export default function Quiz(){
       <div className="bg-white dark:bg-zinc-800 border dark:border-zinc-700 rounded-2xl p-6">
         <h1 className="text-xl font-bold">{q.title}</h1>
         <div className="text-sm text-zinc-500 dark:text-zinc-400">{q.kind} · {q.questions.length} soal · Lulus {q.passingScore}% · {q.attemptLimit === -1 ? "Attempt tak terbatas" : q.attemptLimit === 0 ? "Quiz ditutup" : `Batas ${q.attemptLimit}x`} {q.deadline ? `· Deadline ${new Date(q.deadline).toLocaleString()}` : ""} {q.showAnswers ? "· Kunci jawaban tampil setelah selesai" : ""}</div>
+        {error && <div role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">{error}</div>}
         {result && (
           <div className={`mt-4 p-4 rounded-xl border dark:border-zinc-700 ${result.passed?"bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800":"bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800"}`}>
             <div className="font-bold">{result.passed?"Lulus ✓":"Belum Lulus"}</div>
@@ -67,14 +70,14 @@ export default function Quiz(){
         ))}
       </div>
 
-      <button disabled={submitting || q.attemptLimit === 0} onClick={submit} className="inline-flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-medium disabled:cursor-wait disabled:opacity-70">{submitting && <Spinner />} {q.attemptLimit === 0 ? "Quiz ditutup" : submitting ? "Mengirim..." : "Kirim Jawaban"}</button>
+      <button disabled={submitting || q.attemptLimit === 0 || (q.attemptLimit > 0 && attempts.filter((a:any)=>a.submittedAt).length >= q.attemptLimit)} onClick={submit} className="inline-flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-medium disabled:cursor-not-allowed disabled:opacity-70">{submitting && <Spinner />} {q.attemptLimit === 0 ? "Quiz ditutup" : q.attemptLimit > 0 && attempts.filter((a:any)=>a.submittedAt).length >= q.attemptLimit ? "Batas attempt tercapai" : submitting ? "Mengirim..." : "Kirim Jawaban"}</button>
 
       {attempts.length>0 && (
         <div className="bg-white dark:bg-zinc-800 border dark:border-zinc-700 rounded-2xl p-5">
           <div className="font-semibold text-sm">Riwayat Percobaan</div>
           <div className="mt-2 space-y-1 text-sm">
             {attempts.map((a:any)=>(
-              <div key={a.id} className="flex justify-between border-b dark:border-zinc-700 py-2"><span>{new Date(a.submittedAt||a.startedAt).toLocaleString()} • {Math.round(a.score)}% {a.passed?"✓":"✗"}</span><span>{a.user?.nim}</span></div>
+              <div key={a.id} className="flex justify-between border-b dark:border-zinc-700 py-2"><span>{new Date(a.submittedAt||a.startedAt).toLocaleString()} • {a.score == null ? "Belum dinilai" : `${Math.round(a.score)}% ${a.passed?"✓":"✗"}`}</span><span>{a.user?.nim}</span></div>
             ))}
           </div>
         </div>
