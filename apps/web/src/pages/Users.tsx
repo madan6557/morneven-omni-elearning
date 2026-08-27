@@ -20,6 +20,7 @@ export default function Users() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
+      <BackupPanel />
       <div><p className="eyebrow">People & access</p><h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">Kelola user</h1><p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Atur akun dan peran pengguna agar akses platform tetap terkontrol.</p></div>
       <section className="section-card space-y-5">
         <div className="flex items-start gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-200"><UserPlus size={19} /></div><div><h2 className="font-semibold">Tambah user baru</h2><p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Lengkapi identitas dasar dan tentukan role akses.</p></div></div>
@@ -39,3 +40,5 @@ export default function Users() {
     </div>
   );
 }
+
+function BackupPanel() { const [file, setFile] = useState<File | null>(null); const [busy, setBusy] = useState(false); const { showFeedback, requestConfirmation } = useFeedback(); const download = async () => { const response = await api.get("/api/backup/download", { responseType: "blob" }); const url = URL.createObjectURL(response.data); const link = document.createElement("a"); link.href = url; link.download = "elearning-backup.zip"; link.click(); URL.revokeObjectURL(url); }; const restore = async () => { if (!file || !(await requestConfirmation("Restore akan mengganti seluruh database dan file upload saat ini. Lanjutkan?"))) return; setBusy(true); try { const data = new FormData(); data.append("file", file); await api.post("/api/backup/restore", data); showFeedback("Restore berhasil. Restart server diperlukan."); } catch (error: any) { showFeedback(error.response?.data?.message || "Restore gagal.", "error"); } finally { setBusy(false); } }; return <section className="section-card space-y-3"><div><h2 className="font-semibold">Backup & restore</h2><p className="mt-1 text-sm text-zinc-500">Backup mencakup database dan seluruh file upload.</p></div><div className="flex flex-wrap items-center gap-3"><button onClick={download} className="secondary-button">Download backup ZIP</button><input type="file" accept=".zip" onChange={(event) => setFile(event.target.files?.[0] || null)} /><button onClick={restore} disabled={!file || busy} className="primary-button disabled:opacity-50">{busy ? "Memulihkan..." : "Restore backup"}</button></div><p className="text-xs text-amber-700">Restore hanya untuk admin dan mengganti data yang sedang digunakan.</p></section>; }

@@ -27,32 +27,33 @@ r.get("/course/:courseId", requireAuth as any, async (req: any, res) => {
   res.json(await prisma.assignment.findMany({ where: { courseId: req.params.courseId, ...(req.user.role === "MAHASISWA" ? { archived: false } : {}) }, include: { module: true }, orderBy: [{ order: "asc" }, { createdAt: "asc" }] }));
 });
 
-r.get("/:id", requireAuth as any, async (req: any, res) => { const item = await prisma.assignment.findUnique({ where: { id: req.params.id }, include: { module: true } }); if (!item || (item.archived && req.user.role === "MAHASISWA")) return res.status(404).json({ message: "Tugas tidak tersedia." }); res.json(item); });
+r.get("/:id", requireAuth as any, async (req: any, res) => { const item = await prisma.assignment.findUnique({ where: { id: req.params.id }, include: { module: true } }); if (!item || (item.archived && req.user.role === "MAHASISWA")) return res.status(404).json({ message: "Tugas tidak tersedia." }); if (req.user.role === "MAHASISWA" && item.availableFrom && item.availableFrom > new Date()) return res.status(403).json({ message: "Tugas belum tersedia sesuai jadwal." }); res.json(item); });
 
 r.post("/", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (req: any, res) => {
-  const { courseId, moduleId, title, description, deadline } = req.body;
+  const { courseId, moduleId, title, description, availableFrom, deadline } = req.body;
   if (!courseId || !moduleId || !title?.trim()) return res.status(400).json({ message: "courseId, moduleId, dan title wajib diisi." });
   const module = await prisma.module.findFirst({ where: { id: moduleId, courseId } });
   if (!module) return res.status(400).json({ message: "Modul tidak berada pada matkul ini." });
   const [last, assignmentContent, materialContent, quizContent] = await Promise.all([prisma.assignment.findFirst({ where: { moduleId }, orderBy: { order: "desc" } }), prisma.assignment.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } }), prisma.material.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } }), prisma.quiz.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } })]);
   const contentOrder = Math.max(assignmentContent?.contentOrder ?? 0, materialContent?.contentOrder ?? 0, quizContent?.contentOrder ?? 0) + 1;
-  const item = await prisma.assignment.create({ data: { courseId, moduleId, order: (last?.order ?? 0) + 1, contentOrder, title: title.trim(), description: description || null, deadline: deadline ? new Date(deadline) : null } });
+  const item = await prisma.assignment.create({ data: { courseId, moduleId, order: (last?.order ?? 0) + 1, contentOrder, title: title.trim(), description: description || null, availableFrom: availableFrom ? new Date(availableFrom) : null, deadline: deadline ? new Date(deadline) : null } });
   res.status(201).json(item);
 });
 
 r.put("/:id", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (req: any, res) => {
   const existing = await prisma.assignment.findUnique({ where: { id: req.params.id } });
   if (!existing) return res.status(404).json({ message: "Tugas tidak ditemukan." });
-  const { moduleId, title, description, deadline, archived } = req.body;
+  const { moduleId, title, description, availableFrom, deadline, archived } = req.body;
   if (!moduleId) return res.status(400).json({ message: "Tugas wajib berada di dalam modul." });
   const module = await prisma.module.findFirst({ where: { id: moduleId, courseId: existing.courseId } }); if (!module) return res.status(400).json({ message: "Modul tidak berada pada matkul ini." });
-  res.json(await prisma.assignment.update({ where: { id: req.params.id }, data: { moduleId, title: title?.trim(), description: description || null, deadline: deadline ? new Date(deadline) : null, ...(typeof archived === "boolean" ? { archived } : {}) } }));
+  res.json(await prisma.assignment.update({ where: { id: req.params.id }, data: { moduleId, title: title?.trim(), description: description || null, availableFrom: availableFrom ? new Date(availableFrom) : null, deadline: deadline ? new Date(deadline) : null, ...(typeof archived === "boolean" ? { archived } : {}) } }));
 });
 
 r.post("/:id/submit", requireAuth as any, safeUpload, async (req: any, res) => {
   if (req.user.role !== "MAHASISWA") return res.status(403).json({ message: "Hanya mahasiswa yang dapat mengumpulkan tugas." });
   const assignment = await prisma.assignment.findUnique({ where: { id: req.params.id } });
   if (!assignment || assignment.archived) return res.status(404).json({ message: "Tugas tidak tersedia." });
+  if (assignment.availableFrom && assignment.availableFrom > new Date()) return res.status(403).json({ message: "Tugas belum tersedia sesuai jadwal." });
   if (assignment.deadline && assignment.deadline < new Date()) { if (req.file) await removeSubmissionFile(`/uploads/${req.file.filename}`); return res.status(403).json({ message: "Deadline tugas telah lewat." }); }
   const externalUrl = String(req.body.externalUrl || "").trim() || null;
   if (externalUrl) { try { const url = new URL(externalUrl); if (url.protocol !== "https:") throw new Error(); } catch { if (req.file) await removeSubmissionFile(`/uploads/${req.file.filename}`); return res.status(400).json({ message: "Link submission harus berupa URL HTTPS yang valid." }); } }

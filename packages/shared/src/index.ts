@@ -22,6 +22,7 @@ export const CreateQuizSchema = z.object({
   timeLimit: z.number().nullable().optional(),
   attemptLimit: z.number().int().min(-1).default(1),
   showAnswers: z.boolean().default(false),
+  availableFrom: z.string().datetime().nullable().optional(),
   questions: z.array(z.object({
     type: z.enum(["MULTIPLE_CHOICE", "ESSAY"]).default("MULTIPLE_CHOICE"),
     text: z.string().min(1),
@@ -48,6 +49,7 @@ export const CreateMaterialSchema = z.object({
   duration: z.number().optional(),
   totalPages: z.number().optional(),
   requireCompletionForDownload: z.boolean().optional(),
+  availableFrom: z.string().datetime().nullable().optional(),
   order: z.number().optional(),
 });
 
