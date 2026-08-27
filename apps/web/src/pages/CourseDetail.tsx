@@ -21,7 +21,7 @@ export default function CourseDetail() {
   const sMap = new Map((progress?.slides || []).map((x: any) => [x.materialId, x.percent]));
   const dlSet = new Set((progress?.downloads || []).map((x: any) => x.materialId));
   const quizDone = new Set((progress?.attempts || []).map((x: any) => x.quizId));
-  const totalItems = c.modules?.reduce((sum: number, module: any) => sum + (module.materials?.length || 0) + (module.quizzes?.length || 0), 0) || 0;
+  const totalItems = (c.assignments?.filter((item: any) => !item.archived).length || 0) + (c.modules?.reduce((sum: number, module: any) => sum + (module.materials?.filter((item: any) => !item.archived).length || 0) + (module.quizzes?.filter((item: any) => !item.archived).length || 0), 0) || 0);
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -38,6 +38,7 @@ export default function CourseDetail() {
       </section>
 
       <div className="space-y-5">
+        {c.assignments?.filter((item: any) => !item.archived).length > 0 && <section className="section-card overflow-hidden p-0"><div className="border-b border-zinc-100 bg-zinc-50/70 px-5 py-4 dark:border-zinc-800 dark:bg-zinc-800/50"><h2 className="font-semibold">Tugas</h2></div><div className="divide-y divide-zinc-100 dark:divide-zinc-800">{c.assignments.filter((item: any) => !item.archived).map((item: any) => <div key={item.id} className="px-5 py-4 sm:px-6"><p className="text-sm font-semibold">{item.title}</p>{item.description && <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{item.description}</p>}<p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300">{item.deadline ? `Deadline: ${new Date(item.deadline).toLocaleString()}` : "Tanpa deadline"}</p></div>)}</div></section>}
         {c.modules?.map((m: any, moduleIndex: number) => (
           <section key={m.id} className="section-card overflow-hidden p-0">
             <div className="flex flex-col gap-3 border-b border-zinc-100 bg-zinc-50/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-zinc-800 dark:bg-zinc-800/50">
@@ -45,14 +46,14 @@ export default function CourseDetail() {
               <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{m.materials.length} materi · {m.quizzes.length} quiz</span>
             </div>
             <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {m.quizzes?.filter((q: any) => q.kind === "PRETEST").map((q: any) => <QuizRow key={q.id} q={q} done={quizDone.has(q.id)} />)}
-              {m.materials?.map((mat: any) => {
+              {m.quizzes?.filter((q: any) => !q.archived && q.kind === "PRETEST").map((q: any) => <QuizRow key={q.id} q={q} done={quizDone.has(q.id)} />)}
+              {m.materials?.filter((item: any) => !item.archived).map((mat: any) => {
                 const isVideo = mat.type === "VIDEO";
                 const isSlide = mat.type === "PDF" || mat.type === "PPT";
                 const pct = Number(isVideo ? (vMap.get(mat.id) as number || 0) : isSlide ? (sMap.get(mat.id) as number || (dlSet.has(mat.id) ? 5 : 0)) : dlSet.has(mat.id) ? 100 : 0);
                 return <MaterialRow key={mat.id} mat={mat} pct={pct} downloaded={dlSet.has(mat.id)} isVideo={isVideo} />;
               })}
-              {m.quizzes?.filter((q: any) => q.kind === "POSTTEST" || q.kind === "QUIZ").map((q: any) => <QuizRow key={q.id} q={q} done={quizDone.has(q.id)} />)}
+              {m.quizzes?.filter((q: any) => !q.archived && (q.kind === "POSTTEST" || q.kind === "QUIZ")).map((q: any) => <QuizRow key={q.id} q={q} done={quizDone.has(q.id)} />)}
             </div>
           </section>
         ))}
@@ -64,7 +65,7 @@ export default function CourseDetail() {
 }
 
 function QuizRow({ q, done }: { q: any; done: boolean }) {
-  return <Link to={`/quiz/${q.id}`} className="group flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-violet-50/50 sm:px-6 dark:hover:bg-violet-950/20"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-200"><ClipboardCheck size={18} /></span><div className="min-w-0"><p className="truncate text-sm font-semibold">{q.title}</p><p className="mt-1 truncate text-xs text-zinc-500 dark:text-zinc-400">{q.kind === "PRETEST" ? "Pretest" : q.kind === "POSTTEST" ? "Posttest" : "Quiz"} · {q.questions.length} soal{q.passingScore ? ` · Lulus ${q.passingScore}%` : ""}</p></div></div><span className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${done ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"}`}>{done ? "Selesai" : "Kerjakan"}</span></Link>;
+  return <Link to={`/quiz/${q.id}`} className="group flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-violet-50/50 sm:px-6 dark:hover:bg-violet-950/20"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-200"><ClipboardCheck size={18} /></span><div className="min-w-0"><p className="truncate text-sm font-semibold">{q.title}</p><p className="mt-1 truncate text-xs text-zinc-500 dark:text-zinc-400">{q.kind === "PRETEST" ? "Pretest" : q.kind === "POSTTEST" ? "Posttest" : "Quiz"} · {q.questions.length} soal{q.passingScore ? ` · Lulus ${q.passingScore}%` : ""}{q.deadline ? ` · Deadline ${new Date(q.deadline).toLocaleString()}` : ""}</p></div></div><span className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${done ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"}`}>{done ? "Selesai" : "Kerjakan"}</span></Link>;
 }
 
 function MaterialRow({ mat, pct, downloaded, isVideo }: { mat: any; pct: number; downloaded: boolean; isVideo: boolean }) {

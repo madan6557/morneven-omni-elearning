@@ -38,7 +38,7 @@ export default function Quiz(){
       <Link to={q.moduleId ? `/courses/${q.module?.courseId||""}` : `/courses/${q.courseId}`} className="text-sm text-zinc-500 dark:text-zinc-400">← Kembali</Link>
       <div className="bg-white dark:bg-zinc-800 border dark:border-zinc-700 rounded-2xl p-6">
         <h1 className="text-xl font-bold">{q.title}</h1>
-        <div className="text-sm text-zinc-500 dark:text-zinc-400">{q.kind} · {q.questions.length} soal · Lulus {q.passingScore}% · {q.attemptLimit === -1 ? "Attempt tak terbatas" : q.attemptLimit === 0 ? "Quiz ditutup" : `Batas ${q.attemptLimit}x`} {q.showAnswers ? "· Kunci jawaban tampil setelah selesai" : ""}</div>
+        <div className="text-sm text-zinc-500 dark:text-zinc-400">{q.kind} · {q.questions.length} soal · Lulus {q.passingScore}% · {q.attemptLimit === -1 ? "Attempt tak terbatas" : q.attemptLimit === 0 ? "Quiz ditutup" : `Batas ${q.attemptLimit}x`} {q.deadline ? `· Deadline ${new Date(q.deadline).toLocaleString()}` : ""} {q.showAnswers ? "· Kunci jawaban tampil setelah selesai" : ""}</div>
         {result && (
           <div className={`mt-4 p-4 rounded-xl border dark:border-zinc-700 ${result.passed?"bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800":"bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800"}`}>
             <div className="font-bold">{result.passed?"Lulus ✓":"Belum Lulus"}</div>

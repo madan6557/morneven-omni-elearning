@@ -38,6 +38,7 @@ model Course {
   modules     Module[]
   enrollments Enrollment[]
   quizzes     Quiz[] // pretest per course
+  assignments Assignment[]
   instructors CourseInstructor[]
 }
 
@@ -61,6 +62,7 @@ model Module {
 
   materials Material[]
   quizzes   Quiz[]
+  assignments Assignment[]
 
   @@index([courseId])
   @@unique([courseId, order])
@@ -76,6 +78,7 @@ model Material {
   sourceUrl  String // yt id / drive id / /uploads/xxx
   duration   Int? // seconds for video
   totalPages Int? // for PDF
+  archived   Boolean  @default(false)
   order      Int          @default(0)
   externalId String?      @unique
   createdAt  DateTime     @default(now())
@@ -149,10 +152,28 @@ model Quiz {
   timeLimit    Int? // minutes, null = no limit
   attemptLimit Int      @default(1)
   showAnswers  Boolean  @default(false)
+  deadline     DateTime?
+  archived     Boolean  @default(false)
   createdAt    DateTime @default(now())
 
   questions Question[]
   attempts  QuizAttempt[]
+
+  @@index([courseId])
+  @@index([moduleId])
+}
+
+model Assignment {
+  id          String   @id @default(cuid())
+  courseId    String
+  course      Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  moduleId    String?
+  module      Module? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  deadline    DateTime?
+  archived    Boolean  @default(false)
+  createdAt   DateTime @default(now())
 
   @@index([courseId])
   @@index([moduleId])

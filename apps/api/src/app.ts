@@ -7,6 +7,7 @@ import courseRoutes from "./routes/courses.js";
 import materialRoutes from "./routes/materials.js";
 import progressRoutes from "./routes/progress.js";
 import quizRoutes from "./routes/quizzes.js";
+import assignmentRoutes from "./routes/assignments.js";
 
 export function createApp() {
   const app = express();
@@ -29,6 +30,7 @@ export function createApp() {
   app.use("/api/materials", materialRoutes);
   app.use("/api/progress", progressRoutes);
   app.use("/api/quizzes", quizRoutes);
+  app.use("/api/assignments", assignmentRoutes);
   // integration sso stub — ponytail: verify JWT shared secret
   app.post("/api/integration/auth/sso", async (req,res)=>{
     const { token } = req.body;

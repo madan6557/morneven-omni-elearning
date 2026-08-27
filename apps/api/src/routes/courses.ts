@@ -26,9 +26,9 @@ r.get("/", requireAuth as any, async (req: any, res) => {
   if (role === "MAHASISWA") {
     const enrolls = await prisma.enrollment.findMany({ where: { userId: id }, select: { courseId: true } });
     const ids = enrolls.map((e:any) => e.courseId);
-    courses = await prisma.course.findMany({ where: { id: { "in": ids } }, include: { modules: { include: { materials: true, quizzes: true } }, instructors: { include: { user: { select: { id: true, nim: true, name: true } } } } } as any, orderBy: { createdAt: "desc" } });
+  courses = await prisma.course.findMany({ where: { id: { "in": ids } }, include: { assignments: true, modules: { include: { materials: true, quizzes: true, assignments: true } }, instructors: { include: { user: { select: { id: true, nim: true, name: true } } } } } as any, orderBy: { createdAt: "desc" } });
   } else {
-    courses = await prisma.course.findMany({ include: { modules: { include: { materials: true, quizzes: true } }, instructors: { include: { user: { select: { id: true, nim: true, name: true } } } } } as any, orderBy: { createdAt: "desc" } });
+    courses = await prisma.course.findMany({ include: { assignments: true, modules: { include: { materials: true, quizzes: true, assignments: true } }, instructors: { include: { user: { select: { id: true, nim: true, name: true } } } } } as any, orderBy: { createdAt: "desc" } });
   }
   // add enrollment count
   const withCount = await Promise.all(courses.map(async c => {
@@ -41,7 +41,7 @@ r.get("/", requireAuth as any, async (req: any, res) => {
 r.get("/:id", requireAuth as any, async (req: any, res) => {
   const c = await prisma.course.findUnique({
     where: { id: req.params.id },
-    include: { modules: { orderBy: { order: "asc" }, include: { materials: { orderBy: { order: "asc" } }, quizzes: { include: { questions: { orderBy: { order: "asc" } } } } } }, instructors: { include: { user: { select: { id: true, nim: true, name: true } } } } } as any
+    include: { assignments: { orderBy: { deadline: "asc" } }, modules: { orderBy: { order: "asc" }, include: { materials: { orderBy: { order: "asc" } }, quizzes: { include: { questions: { orderBy: { order: "asc" } } } }, assignments: { orderBy: { deadline: "asc" } } } }, instructors: { include: { user: { select: { id: true, nim: true, name: true } } } } } as any
   });
   if (!c) return res.status(404).json({ message: "Not found" });
   res.json(req.user.role === "MAHASISWA" ? hideAnswerKeys(c) : c);
