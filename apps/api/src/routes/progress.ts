@@ -1,9 +1,12 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
-import { requireAuth, requireApiKey } from "../middleware/auth.js";
+import { requireAuth, requireApiKey, requireRole } from "../middleware/auth.js";
 import { VideoProgressSchema, SlideProgressSchema } from "@repo/shared";
 import { denyIfNoCourseAccess } from "../lib/courseAccess.js";
 const r = Router();
+// Progress belajar hanya boleh dibuat oleh akun mahasiswa pemilik progress.
+r.use("/video", requireAuth as any, requireRole("MAHASISWA") as any);
+r.use("/slide", requireAuth as any, requireRole("MAHASISWA") as any);
 
 // video progress — ponytail: upsert, max watch, percent = lastPos/duration
 r.post("/video", requireAuth as any, async (req:any,res)=>{

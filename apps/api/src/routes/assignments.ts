@@ -8,6 +8,7 @@ import { denyIfNoCourseAccess } from "../lib/courseAccess.js";
 import { notifyCourseStudents, notifyUsers } from "../lib/notifications.js";
 
 const r = Router();
+const validateReorder = (req: any, res: any, next: any) => ["up", "down"].includes(req.body.direction) ? next() : res.status(400).json({ message: "direction harus bernilai up atau down." });
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 const uploadRoot = path.resolve(uploadDir);
@@ -104,7 +105,7 @@ r.delete("/submissions/:submissionId", requireAuth as any, requireRole("ADMIN", 
   res.json({ ok: true });
 });
 
-r.patch("/:id/reorder", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (req: any, res) => {
+r.patch("/:id/reorder", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, validateReorder, async (req: any, res) => {
   const current = await prisma.assignment.findUnique({ where: { id: req.params.id } });
   if (!current?.moduleId) return res.status(400).json({ message: "Tugas harus memiliki modul." });
   const items = await orderItems(current.moduleId); const index = items.findIndex((item) => item.id === current.id); const target = index + (req.body.direction === "up" ? -1 : 1);

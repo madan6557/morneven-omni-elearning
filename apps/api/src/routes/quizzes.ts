@@ -11,6 +11,7 @@ import { audit } from "../lib/audit.js";
 import { notifyCourseStudents } from "../lib/notifications.js";
 
 const r = Router();
+const validateReorder = (req: any, res: any, next: any) => ["up", "down"].includes(req.body.direction) ? next() : res.status(400).json({ message: "direction harus bernilai up atau down." });
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 const imageUpload = multer({ storage: multer.diskStorage({ destination: (_req, _file, cb) => cb(null, uploadDir), filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_")}`) }), limits: { fileSize: 5 * 1024 * 1024 }, fileFilter: (_req, file, cb) => cb(null, /^image\/(jpeg|png|gif|webp)$/.test(file.mimetype)) });
@@ -51,6 +52,9 @@ r.use("/", requireAuth as any, async (req: any, res, next) => {
 });
 r.use("/:id/submit", requireAuth as any, async (req: any, res, next) => { const quiz = await prisma.quiz.findUnique({ where: { id: req.params.id }, select: { availableFrom: true, deadline: true, archived: true, timerMode: true } }); if (!quiz || quiz.archived) return res.status(404).json({ message: "Quiz tidak tersedia." }); if (req.user.role === "MAHASISWA" && quiz.availableFrom && quiz.availableFrom > new Date()) return res.status(403).json({ message: "Quiz belum tersedia sesuai jadwal." }); const active = await prisma.quizAttempt.findFirst({ where: { quizId: req.params.id, userId: req.user.id, submittedAt: null }, orderBy: { startedAt: "desc" }, select: { id: true } }); if (quiz.deadline && quiz.deadline < new Date() && (quiz.timerMode === "SYNC_DEADLINE" || !active)) return res.status(403).json({ message: "Deadline quiz telah lewat." }); next(); });
 r.use("/:id/submit", requireAuth as any, async (req: any, res, next) => { const attempt = await prisma.quizAttempt.findFirst({ where: { quizId: req.params.id, userId: req.user.id, submittedAt: null }, orderBy: { startedAt: "desc" }, select: { expiresAt: true } }); if (attempt?.expiresAt && attempt.expiresAt <= new Date()) return res.status(403).json({ message: "Waktu pengerjaan telah habis." }); next(); });
+r.use("/:id/start", requireAuth as any, requireRole("MAHASISWA") as any);
+r.use("/:id/submit", requireAuth as any, requireRole("MAHASISWA") as any);
+r.use("/:id/reorder", validateReorder);
 
 r.get("/template", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, (_req, res) => {
   const sheet = XLSX.utils.aoa_to_sheet([["title", "module", "passingScore", "timeLimit", "timerMode", "attemptLimit", "showAnswers", "randomizeQuestions", "randomizeOptions", "questionCount", "questionType", "question", "options", "correctIndex", "points", "imageUrl"], ["Contoh ujian", "Nama modul UTS/UAS", 60, 120, "INDEPENDENT", -1, false, false, false, "", "MULTIPLE_CHOICE", "Ibukota Indonesia?", "Jakarta||Bandung||Surabaya", 0, 10, "https://example.com/peta-indonesia.png"], ["Contoh ujian", "Nama modul UTS/UAS", 60, 120, "INDEPENDENT", -1, false, false, false, "", "ESSAY", "Jelaskan makna kemerdekaan.", "", "", 20, ""]]);

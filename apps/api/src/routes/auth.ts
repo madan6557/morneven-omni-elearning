@@ -59,6 +59,7 @@ r.get("/me", requireAuth as any, async (req: any, res) => {
 
 r.get("/users", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req: any, res) => {
   const role = ["DOSEN", "MAHASISWA"].includes(req.query.role) ? req.query.role : undefined;
+  if (req.user.role === "DOSEN" && role !== "MAHASISWA") return res.status(403).json({ message: "Dosen hanya dapat mencari mahasiswa untuk kebutuhan kelas." });
   const search = String(req.query.search || "").trim();
   const parsedLimit = Number(req.query.limit);
   const parsedPage = Number(req.query.page);

@@ -8,6 +8,7 @@ import { CreateMaterialSchema } from "@repo/shared";
 import { denyIfNoCourseAccess } from "../lib/courseAccess.js";
 import { notifyCourseStudents } from "../lib/notifications.js";
 const r = Router();
+const validateReorder = (req: any, res: any, next: any) => ["up", "down"].includes(req.body.direction) ? next() : res.status(400).json({ message: "direction harus bernilai up atau down." });
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 const uploadRoot = path.resolve(uploadDir);
@@ -27,7 +28,9 @@ const storage = multer.diskStorage({
   destination: (_req,_file,cb)=>cb(null,uploadDir),
   filename: (_req,file,cb)=>cb(null, Date.now()+"-"+file.originalname.replace(/\s+/g,"_"))
 });
-const upload = multer({ storage, limits:{ fileSize: 500*1024*1024 } });
+const materialMimeTypes: Record<string, string[]> = { ".pdf": ["application/pdf"], ".ppt": ["application/vnd.ms-powerpoint"], ".pptx": ["application/vnd.openxmlformats-officedocument.presentationml.presentation"], ".mp4": ["video/mp4"], ".webm": ["video/webm"], ".mov": ["video/quicktime"] };
+const upload = multer({ storage, limits:{ fileSize: 500*1024*1024 }, fileFilter: (_req, file, cb) => { const ext = path.extname(file.originalname).toLowerCase(); cb(null, Boolean(materialMimeTypes[ext]?.includes(file.mimetype))); } });
+const safeMaterialUpload = (req: any, res: any, next: any) => upload.single("file")(req, res, (error: any) => error ? res.status(error.code === "LIMIT_FILE_SIZE" ? 413 : 400).json({ message: error.code === "LIMIT_FILE_SIZE" ? "Ukuran materi maksimal 500 MB." : "Format materi tidak diizinkan. Gunakan PDF, PPT, MP4, WEBM, atau MOV." }) : next());
 r.use("/:id", requireAuth as any, async (req: any, res, next) => { const material = await prisma.material.findUnique({ where: { id: req.params.id }, select: { module: { select: { courseId: true } } } }); if (material?.module && await denyIfNoCourseAccess(req.user, material.module.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." }); next(); });
 
 // create material
@@ -46,7 +49,7 @@ r.post("/", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,
 });
 
 // upload file then create material
-r.post("/upload", requireAuth as any, requireRole("ADMIN","DOSEN") as any, upload.single("file"), async (req:any,res)=>{
+r.post("/upload", requireAuth as any, requireRole("ADMIN","DOSEN") as any, safeMaterialUpload, async (req:any,res)=>{
   if(!req.file) return res.status(400).json({message:"file required"});
   const { moduleId, title, type } = req.body;
   if(!moduleId || !title || !type) return res.status(400).json({message:"moduleId, title, type required"});
@@ -86,7 +89,7 @@ r.put("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (re
   res.json(m);
 });
 
-r.patch("/:id/reorder", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req:any,res)=>{
+r.patch("/:id/reorder", requireAuth as any, requireRole("ADMIN","DOSEN") as any, validateReorder, async (req:any,res)=>{
   const current = await prisma.material.findUnique({ where:{id:req.params.id} }); if (!current) return res.status(404).json({message:"Materi tidak ditemukan."});
   const items = await prisma.material.findMany({ where:{moduleId:current.moduleId}, orderBy:[{order:"asc"},{createdAt:"asc"}] }); const index=items.findIndex((item)=>item.id===current.id); const target=index+(req.body.direction==="up"?-1:1); if(target<0||target>=items.length) return res.json(current);
   await prisma.$transaction(async(tx)=>{ await tx.material.update({where:{id:current.id},data:{order:-1}}); await tx.material.update({where:{id:items[target].id},data:{order:current.order}}); await tx.material.update({where:{id:current.id},data:{order:items[target].order}}); }); res.json(await prisma.material.findUnique({where:{id:current.id}}));
