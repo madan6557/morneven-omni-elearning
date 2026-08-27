@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useFeedback } from "../context/FeedbackContext";
+import api from "../lib/api";
 import {
   ChartBar,
   BookOpen,
@@ -13,6 +14,7 @@ import {
   Sun,
   Users,
   HelpCircle,
+  KeyRound,
 } from "lucide-react";
 
 class RouteErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
@@ -40,6 +42,9 @@ export default function Layout({ children }: { children: any }) {
   const { showFeedback, requestConfirmation, unsavedMessage, setUnsavedChanges } = useFeedback();
   const nav = useNavigate();
   const location = useLocation();
+  const [password, setPassword] = useState("");
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   if (!user) return <>{children}</>;
 
@@ -131,6 +136,7 @@ export default function Layout({ children }: { children: any }) {
           <p className="text-xs font-semibold text-violet-700 dark:text-violet-200">Akun aktif</p>
           <p className="mt-2 truncate text-sm font-semibold">{user.name}</p>
           <p className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">{user.nim} · {user.role}</p>
+          <button onClick={() => { setPassword(""); setShowPasswordForm(true); }} className="secondary-button mt-3 min-h-9 w-full px-3 py-1.5 text-xs"><KeyRound size={14} /> Ganti password</button>
           <button onClick={handleLogout} className="secondary-button mt-4 min-h-9 w-full px-3 py-1.5 text-xs">
             <LogOut size={14} /> Keluar
           </button>
@@ -179,6 +185,8 @@ export default function Layout({ children }: { children: any }) {
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10">{contextArticle && <div className="mb-4 flex justify-end"><Link to={`/help?article=${contextArticle}`} className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-950/40"><HelpCircle size={15} /> Bantuan halaman ini</Link></div>}<RouteErrorBoundary>{children}</RouteErrorBoundary></main>
         <div className="px-4 pb-5 text-center text-[11px] text-zinc-400 sm:px-6 lg:px-10">OMNI E-Learning · Belajar lebih terarah, progres lebih terukur</div>
       </div>
+      {showPasswordForm && <div className="fixed inset-0 z-50 grid place-items-center bg-zinc-950/60 p-4" role="dialog" aria-modal="true"><div className="section-card w-full max-w-md space-y-5"><div><p className="eyebrow">Keamanan akun</p><h2 className="mt-2 text-xl font-bold">Ganti password saya</h2><p className="mt-2 text-sm leading-6 text-zinc-500">Password baru minimal 6 karakter.</p></div><input autoFocus type="password" minLength={6} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password baru" className="field" /><div className="flex justify-end gap-3"><button disabled={changingPassword} onClick={() => setShowPasswordForm(false)} className="secondary-button">Batal</button><button disabled={changingPassword || password.length < 6} onClick={async () => { setChangingPassword(true); try { await api.patch("/api/auth/me/password", { password }); showFeedback("Password Anda berhasil diubah."); setShowPasswordForm(false); setPassword(""); } catch (error: any) { showFeedback(error.response?.data?.message || "Password gagal diubah.", "error"); } finally { setChangingPassword(false); } }} className="primary-button disabled:opacity-50">{changingPassword ? "Menyimpan..." : <><KeyRound size={16} /> Simpan password</>}</button></div></div></div>}
     </div>
   );
 }
+import { useState } from "react";

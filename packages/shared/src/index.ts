@@ -4,6 +4,7 @@ import { z } from "zod";
 export const LoginSchema = z.object({ nim: z.string().min(3), password: z.string().min(3) });
 export type LoginDTO = z.infer<typeof LoginSchema>;
 export const RegisterSchema = z.object({ nim: z.string().min(3), name: z.string().min(2), password: z.string().min(6), role: z.enum(["ADMIN","DOSEN","MAHASISWA"]).default("MAHASISWA") });
+export const ChangePasswordSchema = z.object({ password: z.string().min(6, "Password minimal 6 karakter") });
 
 // progress
 export const VideoProgressSchema = z.object({ materialId: z.string(), pos: z.number().min(0), duration: z.number().min(1) });

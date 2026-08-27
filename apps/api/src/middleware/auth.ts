@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { verifyToken } from "../lib/jwt.js";
+import { prisma } from "../lib/prisma.js";
 export interface AuthUser { id: string; nim: string; role: string; }
 export function auth(req: Request & { user?: AuthUser }, _res: Response, next: NextFunction) {
   const h = req.headers.authorization;
@@ -7,6 +8,7 @@ export function auth(req: Request & { user?: AuthUser }, _res: Response, next: N
   try {
     const token = h.slice(7);
     req.user = verifyToken(token);
+    void prisma.user.update({ where: { id: req.user.id }, data: { lastSeenAt: new Date() } }).catch(() => undefined);
   } catch {}
   next();
 }

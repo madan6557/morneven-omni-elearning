@@ -18,6 +18,7 @@ model User {
   role       String   @default("MAHASISWA") // ADMIN | DOSEN | MAHASISWA — ponytail: String for sqlite compat, enum for postgres
   externalId String?  @unique
   createdAt  DateTime @default(now())
+  lastSeenAt DateTime?
 
   enrollments        Enrollment[]
   downloads          MaterialDownload[]
