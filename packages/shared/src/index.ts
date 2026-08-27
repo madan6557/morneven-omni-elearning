@@ -20,6 +20,7 @@ export const CreateQuizSchema = z.object({
   moduleId: z.string().optional(),
   passingScore: z.number().min(0).max(100).default(60),
   timeLimit: z.number().nullable().optional(),
+  timerMode: z.enum(["INDEPENDENT", "SYNC_DEADLINE"]).default("INDEPENDENT"),
   attemptLimit: z.number().int().min(-1).default(1),
   showAnswers: z.boolean().default(false),
   randomizeQuestions: z.boolean().default(false),

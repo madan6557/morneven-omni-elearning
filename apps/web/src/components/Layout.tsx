@@ -1,5 +1,5 @@
 ﻿import { Component, type ErrorInfo, type ReactNode } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useFeedback } from "../context/FeedbackContext";
@@ -12,6 +12,7 @@ import {
   Settings2,
   Sun,
   Users,
+  HelpCircle,
 } from "lucide-react";
 
 class RouteErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
@@ -38,6 +39,7 @@ export default function Layout({ children }: { children: any }) {
   const { theme, toggle } = useTheme();
   const { showFeedback, requestConfirmation, unsavedMessage, setUnsavedChanges } = useFeedback();
   const nav = useNavigate();
+  const location = useLocation();
 
   if (!user) return <>{children}</>;
 
@@ -51,9 +53,11 @@ export default function Layout({ children }: { children: any }) {
     { to: "/rekap", label: "Rekap Progress", icon: ChartBar, show: isDosen || isAdmin },
     { to: "/users", label: "Kelola User", icon: Users, show: isAdmin },
     { to: "/manage", label: "Kelola Materi & Quiz", icon: Settings2, show: isDosen || isAdmin },
+    { to: "/help", label: "Help / Panduan", icon: HelpCircle, show: true },
   ];
 
   const visibleItems = navItems.filter((item) => item.show);
+  const contextArticle = location.pathname.startsWith("/quiz/") ? "quiz-basics" : location.pathname.startsWith("/material/") ? "progress-material" : location.pathname.startsWith("/assignment/") ? "assignments" : location.pathname === "/rekap" || location.pathname.startsWith("/rekap/") ? "student-progress" : location.pathname === "/manage" ? "module-management" : location.pathname === "/users" ? "user-management" : null;
   const handleLogout = async () => {
     if (unsavedMessage && !(await requestConfirmation(`Perubahan belum tersimpan: ${unsavedMessage} Jika keluar sekarang, perubahan tersebut akan hilang.`))) return;
     if (!(await requestConfirmation("Anda akan keluar dari workspace dan kembali ke halaman login."))) return;
@@ -172,7 +176,7 @@ export default function Layout({ children }: { children: any }) {
           ))}
         </nav>
 
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10"><RouteErrorBoundary>{children}</RouteErrorBoundary></main>
+        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10">{contextArticle && <div className="mb-4 flex justify-end"><Link to={`/help?article=${contextArticle}`} className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-950/40"><HelpCircle size={15} /> Bantuan halaman ini</Link></div>}<RouteErrorBoundary>{children}</RouteErrorBoundary></main>
         <div className="px-4 pb-5 text-center text-[11px] text-zinc-400 sm:px-6 lg:px-10">OMNI E-Learning · Belajar lebih terarah, progres lebih terukur</div>
       </div>
     </div>

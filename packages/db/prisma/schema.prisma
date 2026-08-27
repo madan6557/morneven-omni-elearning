@@ -156,6 +156,7 @@ model Quiz {
   kind         String   @default("QUIZ") // QUIZ | PRETEST | POSTTEST
   passingScore Int      @default(60)
   timeLimit    Int? // minutes, null = no limit
+  timerMode    String   @default("INDEPENDENT") // INDEPENDENT | SYNC_DEADLINE
   attemptLimit Int      @default(1)
   showAnswers  Boolean  @default(false)
   randomizeQuestions Boolean @default(false)

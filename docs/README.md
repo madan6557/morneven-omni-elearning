@@ -1,5 +1,7 @@
 # OMNI E-Learning — Dokumentasi Lengkap
 
+Panduan operasional berdasarkan role tersedia di [USER_GUIDE.md](./USER_GUIDE.md). Referensi teknis: [API.md](./API.md), [INTEGRATION.md](./INTEGRATION.md), dan [README.md](../README.md).
+
 > **Goal:** Materi ajar tersampaikan & progress mahasiswa terlacak (download, slide dilihat, durasi tonton, quiz pre/post). Monorepo `pnpm workspaces + Turbo` untuk kolaborasi FE (Vite) + BE (Express), deploy terpisah FE Vercel + BE Railway.
 
 **Live:** FE `https://omni.morneven.com` (Vercel) → BE `https://morneven-omni-elearning-production.up.railway.app` (Railway) → DB Postgres + Volume `500MB` di `/app/apps/api/uploads`
