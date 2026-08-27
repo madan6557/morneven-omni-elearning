@@ -18,6 +18,8 @@ r.get("/course/:courseId", requireAuth as any, async (req: any, res) => {
   res.json(await prisma.assignment.findMany({ where: { courseId: req.params.courseId, ...(req.user.role === "MAHASISWA" ? { archived: false } : {}) }, include: { module: true }, orderBy: [{ order: "asc" }, { createdAt: "asc" }] }));
 });
 
+r.get("/:id", requireAuth as any, async (req: any, res) => { const item = await prisma.assignment.findUnique({ where: { id: req.params.id }, include: { module: true } }); if (!item || (item.archived && req.user.role === "MAHASISWA")) return res.status(404).json({ message: "Tugas tidak tersedia." }); res.json(item); });
+
 r.post("/", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (req: any, res) => {
   const { courseId, moduleId, title, description, deadline } = req.body;
   if (!courseId || !moduleId || !title?.trim()) return res.status(400).json({ message: "courseId, moduleId, dan title wajib diisi." });
@@ -48,6 +50,12 @@ r.post("/:id/submit", requireAuth as any, upload.single("file"), async (req: any
   const submission = await prisma.assignmentSubmission.upsert({ where: { assignmentId_userId: { assignmentId: assignment.id, userId: req.user.id } }, update: { note: req.body.note || null, fileUrl, fileName: req.file?.originalname || previous?.fileName || null, submittedAt: new Date(), score: null, feedback: null, gradedAt: null }, create: { assignmentId: assignment.id, userId: req.user.id, note: req.body.note || null, fileUrl, fileName: req.file?.originalname || null } });
   if (req.file && previous?.fileUrl && previous.fileUrl !== fileUrl) await removeSubmissionFile(previous.fileUrl);
   res.status(201).json(submission);
+});
+
+r.get("/:id/submission", requireAuth as any, async (req: any, res) => {
+  if (req.user.role !== "MAHASISWA") return res.status(403).json({ message: "Hanya mahasiswa yang dapat melihat submission sendiri." });
+  const item = await prisma.assignmentSubmission.findUnique({ where: { assignmentId_userId: { assignmentId: req.params.id, userId: req.user.id } } });
+  res.json(item);
 });
 
 r.get("/:id/submissions", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (req, res) => {

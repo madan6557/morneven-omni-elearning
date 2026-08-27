@@ -13,6 +13,8 @@ import Rekap from "./pages/Rekap";
 import Manage from "./pages/Manage";
 import Users from "./pages/Users";
 import StudentProgress from "./pages/StudentProgress";
+import Assignment from "./pages/Assignment";
+import AssignmentSubmissions from "./pages/AssignmentSubmissions";
 const qc=new QueryClient();
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -55,6 +57,8 @@ export default function App(){
             <Route path="/courses/:id" element={<Protected><Layout><CourseDetail/></Layout></Protected>}/>
             <Route path="/material/:id" element={<Protected><Layout><MaterialView/></Layout></Protected>}/>
             <Route path="/quiz/:id" element={<Protected><Layout><Quiz/></Layout></Protected>}/>
+            <Route path="/assignment/:id" element={<Protected><Layout><Assignment/></Layout></Protected>}/>
+            <Route path="/assignment/:id/submissions" element={<Protected roles={["ADMIN","DOSEN"]}><Layout><AssignmentSubmissions/></Layout></Protected>}/>
             <Route path="/rekap" element={<Protected roles={["ADMIN","DOSEN"]}><Layout><Rekap/></Layout></Protected>}/>
             <Route path="/rekap/:courseId/student/:studentId" element={<Protected roles={["ADMIN","DOSEN"]}><Layout><StudentProgress/></Layout></Protected>}/>
             <Route path="/manage" element={<Protected roles={["ADMIN","DOSEN"]}><Layout><Manage/></Layout></Protected>}/>
