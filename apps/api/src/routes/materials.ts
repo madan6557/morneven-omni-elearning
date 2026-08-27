@@ -8,6 +8,19 @@ import { CreateMaterialSchema } from "@repo/shared";
 const r = Router();
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+const uploadRoot = path.resolve(uploadDir);
+const localUploadPath = (url?: string | null) => {
+  if (!url?.startsWith("/uploads/")) return null;
+  const filePath = path.resolve(uploadRoot, url.slice("/uploads/".length));
+  return filePath.startsWith(`${uploadRoot}${path.sep}`) ? filePath : null;
+};
+const removeMaterialFileIfUnused = async (url?: string | null) => {
+  if (!url) return;
+  const filePath = localUploadPath(url);
+  if (!filePath) return;
+  const stillUsed = await prisma.material.count({ where: { sourceUrl: url } });
+  if (!stillUsed && fs.existsSync(filePath)) await fs.promises.unlink(filePath);
+};
 const storage = multer.diskStorage({
   destination: (_req,_file,cb)=>cb(null,uploadDir),
   filename: (_req,file,cb)=>cb(null, Date.now()+"-"+file.originalname.replace(/\s+/g,"_"))
@@ -31,8 +44,13 @@ r.post("/upload", requireAuth as any, requireRole("ADMIN","DOSEN") as any, uploa
   const sourceUrl = `/uploads/${req.file.filename}`;
   const totalPages = (type==="PDF" || type==="PPT") ? Number(req.body.totalPages|| (type==="PPT"?10:12)) : undefined;
   const last = await prisma.material.findFirst({ where: { moduleId }, orderBy: { order: "desc" } });
-  const m = await prisma.material.create({ data:{ moduleId, title, type, sourceType:"upload", sourceUrl, order: (last?.order ?? 0) + 1, totalPages, duration: type==="VIDEO"? Number(req.body.duration||0): undefined } });
-  res.status(201).json(m);
+  try {
+    const m = await prisma.material.create({ data:{ moduleId, title, type, sourceType:"upload", sourceUrl, order: (last?.order ?? 0) + 1, totalPages, duration: type==="VIDEO"? Number(req.body.duration||0): undefined } });
+    res.status(201).json(m);
+  } catch (error) {
+    await removeMaterialFileIfUnused(sourceUrl);
+    throw error;
+  }
 });
 
 r.get("/:id", requireAuth as any, async (req,res)=>{
@@ -42,7 +60,10 @@ r.get("/:id", requireAuth as any, async (req,res)=>{
 });
 
 r.put("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
+  const existing = await prisma.material.findUnique({ where:{id:req.params.id} });
+  if (!existing) return res.status(404).json({message:"Materi tidak ditemukan."});
   const m = await prisma.material.update({ where:{id:req.params.id}, data:req.body });
+  if (req.body.sourceUrl && req.body.sourceUrl !== existing.sourceUrl) await removeMaterialFileIfUnused(existing.sourceUrl);
   res.json(m);
 });
 
@@ -54,6 +75,7 @@ r.patch("/:id/reorder", requireAuth as any, requireRole("ADMIN","DOSEN") as any,
 
 r.delete("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
   const item=await prisma.material.findUnique({where:{id:req.params.id}}); await prisma.material.delete({ where:{id:req.params.id}});
+  await removeMaterialFileIfUnused(item?.sourceUrl);
   if(item){const rest=await prisma.material.findMany({where:{moduleId:item.moduleId},orderBy:[{order:"asc"},{createdAt:"asc"}]}); await prisma.$transaction(rest.map((row,index)=>prisma.material.update({where:{id:row.id},data:{order:index+1}})));}
   res.json({ok:true});
 });

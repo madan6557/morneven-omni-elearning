@@ -46,11 +46,18 @@ r.get("/users", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (
   const role = ["DOSEN", "MAHASISWA"].includes(req.query.role) ? req.query.role : undefined;
   const search = String(req.query.search || "").trim();
   const parsedLimit = Number(req.query.limit);
-  const take = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 100) : (search || role ? 50 : undefined);
+  const parsedPage = Number(req.query.page);
+  const paginated = req.query.page !== undefined || req.query.limit !== undefined || Boolean(search || role);
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? Math.floor(parsedPage) : 1;
+  const take = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(Math.floor(parsedLimit), 100) : 25;
+  const skip = (page - 1) * take;
   const where: any = { ...(role ? { role } : {}) };
   if (search) where.OR = [{ name: { contains: search } }, { nim: { contains: search } }];
-  const users = await prisma.user.findMany({ where, take, select: { id: true, nim: true, name: true, role: true, createdAt: true }, orderBy: { createdAt: "desc" } });
-  res.json(users);
+  const [users, total] = await prisma.$transaction([
+    prisma.user.findMany({ where, ...(paginated ? { skip, take } : {}), select: { id: true, nim: true, name: true, role: true, createdAt: true }, orderBy: { createdAt: "desc" } }),
+    prisma.user.count({ where }),
+  ]);
+  res.json(paginated ? { items: users, page, limit: take, total, totalPages: Math.ceil(total / take) } : users);
 });
 
 export default r;

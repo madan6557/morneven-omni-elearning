@@ -1,7 +1,17 @@
 import { Router } from "express";
+import path from "path";
+import fs from "fs";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 const r = Router();
+const uploadRoot = path.resolve(process.env.UPLOAD_DIR || "./uploads");
+const removeLocalFileIfUnused = async (url: string | null | undefined, kind: "material" | "question") => {
+  if (!url?.startsWith("/uploads/")) return;
+  const filePath = path.resolve(uploadRoot, url.slice("/uploads/".length));
+  if (!filePath.startsWith(`${uploadRoot}${path.sep}`)) return;
+  const count = kind === "material" ? await prisma.material.count({ where: { sourceUrl: url } }) : await prisma.question.count({ where: { imageUrl: url } });
+  if (!count && fs.existsSync(filePath)) await fs.promises.unlink(filePath);
+};
 
 function hideAnswerKeys(course: any) {
   return {
@@ -59,10 +69,7 @@ r.put("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (re
   res.json(c);
 });
 
-r.delete("/:id", requireAuth as any, requireRole("ADMIN") as any, async (req, res) => {
-  await prisma.course.delete({ where: { id: req.params.id } });
-  res.json({ ok: true });
-});
+r.delete("/:id", requireAuth as any, requireRole("ADMIN") as any, async (req, res) => { const course = await prisma.course.findUnique({ where: { id: req.params.id }, include: { modules: { include: { materials: true, quizzes: { include: { questions: true } } } } } }); if (!course) return res.status(404).json({ message: "Mata kuliah tidak ditemukan." }); await prisma.course.delete({ where: { id: req.params.id } }); const files = course.modules.flatMap((module) => [...module.materials.map((item) => ({ url: item.sourceUrl, kind: "material" as const })), ...module.quizzes.flatMap((quiz) => quiz.questions.map((question) => ({ url: question.imageUrl, kind: "question" as const })))]); await Promise.all(files.map((file) => removeLocalFileIfUnused(file.url, file.kind))); res.json({ ok: true }); });
 
 // modules
 r.post("/:courseId/modules", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
@@ -86,10 +93,7 @@ r.patch("/modules/:id/reorder", requireAuth as any, requireRole("ADMIN", "DOSEN"
   res.json(await prisma.module.findUnique({ where: { id: current.id } }));
 });
 
-r.delete("/modules/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
-  await prisma.module.delete({ where: { id: req.params.id } });
-  res.json({ ok: true });
-});
+r.delete("/modules/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => { const module = await prisma.module.findUnique({ where: { id: req.params.id }, include: { materials: true, quizzes: { include: { questions: true } } } }); if (!module) return res.status(404).json({ message: "Modul tidak ditemukan." }); await prisma.module.delete({ where: { id: req.params.id } }); const files = [...module.materials.map((item) => ({ url: item.sourceUrl, kind: "material" as const })), ...module.quizzes.flatMap((quiz) => quiz.questions.map((question) => ({ url: question.imageUrl, kind: "question" as const })))]; await Promise.all(files.map((file) => removeLocalFileIfUnused(file.url, file.kind))); res.json({ ok: true }); });
 
 // course instructors — one course may have multiple dosen
 r.get("/:id/instructors", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
