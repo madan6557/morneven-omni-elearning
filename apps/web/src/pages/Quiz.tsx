@@ -9,7 +9,7 @@ const mediaUrl = (value: string) => value.startsWith("/") ? `${api.defaults.base
 export default function Quiz(){
   const {id}=useParams();
   const [q,setQ]=useState<any>(null);
-  const [answers,setAnswers]=useState<Record<string,number>>({});
+  const [answers,setAnswers]=useState<Record<string,number|string>>({});
   const [result,setResult]=useState<any>(null);
   const [attempts,setAttempts]=useState<any[]>([]);
   const { showFeedback, requestConfirmation } = useFeedback();
@@ -24,7 +24,7 @@ export default function Quiz(){
     if (submitting) return;
     setSubmitting(true);
     try {
-      const payload = { answers: q.questions.map((qq:any)=>({ questionId: qq.id, chosen: answers[qq.id] ?? -1 })) };
+      const payload = { answers: q.questions.map((qq:any)=> qq.type === "ESSAY" ? ({ questionId: qq.id, answerText: String(answers[qq.id] || "") }) : ({ questionId: qq.id, chosen: Number(answers[qq.id] ?? -1) })) };
       try{ await api.post(`/api/quizzes/${id}/start`); }catch{}
       const r=await api.post(`/api/quizzes/${id}/submit`, payload);
       setResult(r.data);
@@ -53,7 +53,7 @@ export default function Quiz(){
             <div className="font-medium">{idx+1}. {qq.text}</div>
             {qq.imageUrl && <img src={mediaUrl(qq.imageUrl)} alt={`Gambar soal ${idx + 1}`} className="mt-3 max-h-72 rounded-xl object-contain" />}
             <div className="mt-3 space-y-2">
-              {(qq.options as string[]).map((opt, i)=>(
+              {qq.type === "ESSAY" ? <textarea className="field min-h-32" placeholder="Tulis jawaban essay..." value={String(answers[qq.id] || "")} onChange={(e)=>setAnswers(a=>({...a,[qq.id]:e.target.value}))} /> : (qq.options as string[]).map((opt, i)=>(
                 <label key={i} className={`flex gap-3 p-3 rounded-xl border dark:border-zinc-700 cursor-pointer ${answers[qq.id]===i?"bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 border-zinc-900":"bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:bg-zinc-800"}`}>
                   <input type="radio" name={qq.id} checked={answers[qq.id]===i} onChange={()=>setAnswers(a=>({...a,[qq.id]:i}))} className="mt-1"/>
                   <span className="text-sm">{String.fromCharCode(65+i)}. {opt}</span>
@@ -61,7 +61,7 @@ export default function Quiz(){
               ))}
             </div>
             {result && q.showAnswers && result.answerKey?.[qq.id] !== undefined && (
-              <div className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Kunci: {String.fromCharCode(65+result.answerKey[qq.id])} • Jawabanmu: {answers[qq.id]!==undefined? String.fromCharCode(65+answers[qq.id]):"—"} {answers[qq.id]===result.answerKey[qq.id]?"✓":"✗"}</div>
+              <div className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Kunci: {String.fromCharCode(65+result.answerKey[qq.id])} • Jawabanmu: {answers[qq.id]!==undefined? String.fromCharCode(65+Number(answers[qq.id])):"—"} {answers[qq.id]===result.answerKey[qq.id]?"✓":"✗"}</div>
             )}
           </div>
         ))}

@@ -23,17 +23,18 @@ export const CreateQuizSchema = z.object({
   attemptLimit: z.number().int().min(-1).default(1),
   showAnswers: z.boolean().default(false),
   questions: z.array(z.object({
+    type: z.enum(["MULTIPLE_CHOICE", "ESSAY"]).default("MULTIPLE_CHOICE"),
     text: z.string().min(1),
-    options: z.array(z.string()).min(2),
-    correctIndex: z.number().min(0),
+    options: z.array(z.string()).default([]),
+    correctIndex: z.number().min(0).nullable().optional(),
     points: z.number().default(10),
     order: z.number().optional(),
     imageUrl: z.string().refine((value) => value.startsWith("/") || /^https?:\/\//i.test(value), "imageUrl must be an absolute or relative URL").nullable().optional(),
-  })).min(1)
+  }).superRefine((question, ctx) => { if (question.type === "MULTIPLE_CHOICE" && (question.options.length < 2 || question.correctIndex === null || question.correctIndex === undefined || question.correctIndex >= question.options.length)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Multiple choice wajib memiliki minimal 2 opsi dan jawaban benar." }); })).min(1)
 });
 
 export const SubmitQuizSchema = z.object({
-  answers: z.array(z.object({ questionId: z.string(), chosen: z.number() }))
+  answers: z.array(z.object({ questionId: z.string(), chosen: z.number().optional(), answerText: z.string().optional() }))
 });
 export type SubmitQuizDTO = z.infer<typeof SubmitQuizSchema>;
 
@@ -46,6 +47,7 @@ export const CreateMaterialSchema = z.object({
   sourceUrl: z.string().min(1),
   duration: z.number().optional(),
   totalPages: z.number().optional(),
+  requireCompletionForDownload: z.boolean().optional(),
   order: z.number().optional(),
 });
 

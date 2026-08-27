@@ -26,6 +26,7 @@ model User {
   quizAttempts       QuizAttempt[]
   taughtCourses      CourseInstructor[]
   assignmentSubmissions AssignmentSubmission[]
+  quizAnswerGrades QuizAnswerGrade[]
 
   @@index([role])
 }
@@ -80,6 +81,7 @@ model Material {
   duration   Int? // seconds for video
   totalPages Int? // for PDF
   archived   Boolean  @default(false)
+  requireCompletionForDownload Boolean @default(false)
   order      Int          @default(0)
   contentOrder Int         @default(0)
   externalId String?      @unique
@@ -214,10 +216,12 @@ model Question {
   quiz         Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
   order        Int    @default(0)
   text         String
-  options      String // JSON stringify ["A","B","C","D"] for sqlite compat
-  correctIndex Int
+  type         String @default("MULTIPLE_CHOICE") // MULTIPLE_CHOICE | ESSAY
+  options      String @default("[]") // JSON stringify options for sqlite compat
+  correctIndex Int?
   points       Int    @default(10)
   imageUrl     String?
+  answerGrades QuizAnswerGrade[]
 
   @@index([quizId])
 }
@@ -233,7 +237,24 @@ model QuizAttempt {
   answers     String    @default("[]") // JSON stringify [{questionId, chosen}]
   startedAt   DateTime  @default(now())
   submittedAt DateTime?
+  answerGrades QuizAnswerGrade[]
 
   @@index([userId, quizId])
   @@index([quizId])
+}
+
+model QuizAnswerGrade {
+  id         String @id @default(cuid())
+  attemptId  String
+  attempt    QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  graderId   String
+  grader     User @relation(fields: [graderId], references: [id], onDelete: Cascade)
+  score      Float
+  feedback   String?
+  gradedAt   DateTime @default(now())
+
+  @@unique([attemptId, questionId])
+  @@index([questionId])
 }

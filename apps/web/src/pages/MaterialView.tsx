@@ -5,6 +5,7 @@ import VideoPlayer from "../components/VideoPlayer";
 import PdfViewer from "../components/PdfViewer";
 import { useFeedback } from "../context/FeedbackContext";
 import { Spinner } from "../components/Loading";
+import { useAuth } from "../context/AuthContext";
 
 export default function MaterialView(){
   const {id}=useParams();
@@ -13,6 +14,7 @@ export default function MaterialView(){
   const [pct,setPct]=useState(0);
   const nav=useNavigate();
   const { showFeedback } = useFeedback();
+  const { user } = useAuth();
   const [downloading, setDownloading] = useState(false);
   useEffect(()=>{
     api.get(`/api/materials/${id}`).then(async r=>{
@@ -20,6 +22,9 @@ export default function MaterialView(){
       try{
         const c = await api.get(`/api/courses/${r.data.module.courseId}`);
         setCourse(c.data);
+        const progress = await api.get(`/api/progress/course/${r.data.module.courseId}`);
+        const current = r.data.type === "VIDEO" ? progress.data.videos?.find((item:any) => item.materialId === r.data.id)?.percent : progress.data.slides?.find((item:any) => item.materialId === r.data.id)?.percent;
+        if (current !== undefined) setPct(current);
       }catch{}
     }).catch(()=>{});
   },[id]);
@@ -45,6 +50,7 @@ export default function MaterialView(){
     }catch{ showFeedback("Download gagal dicatat.", "error"); }
     finally { setDownloading(false); }
   };
+  const downloadReady = !mat.requireCompletionForDownload || user?.role !== "MAHASISWA" || pct >= 100;
 
   return (
     <div className="space-y-4">
@@ -65,7 +71,7 @@ export default function MaterialView(){
         )}
         {(mat.type==="PDF" || mat.type==="PPT") && (
           <div className="mt-4 flex gap-2">
-            <button disabled={downloading} onClick={handleDownload} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-zinc-800 border dark:border-zinc-700 text-sm disabled:cursor-wait disabled:opacity-70">{downloading ? <Spinner size={14} /> : "⬇"} {downloading ? "Mencatat..." : "Download & Catat Progress"}</button>
+            <button disabled={downloading || !downloadReady} onClick={handleDownload} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-zinc-800 border dark:border-zinc-700 text-sm disabled:cursor-not-allowed disabled:opacity-50">{downloading ? <Spinner size={14} /> : "⬇"} {downloadReady ? (downloading ? "Mencatat..." : "Download & Catat Progress") : "Selesaikan materi terlebih dahulu"}</button>
             <a href={mat.sourceUrl} target="_blank" rel="noreferrer" className="px-4 py-2 rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-sm">Buka File</a>
           </div>
         )}

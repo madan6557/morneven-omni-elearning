@@ -64,8 +64,8 @@ r.get("/:id", requireAuth as any, async (req,res)=>{
 r.put("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req,res)=>{
   const existing = await prisma.material.findUnique({ where:{id:req.params.id} });
   if (!existing) return res.status(404).json({message:"Materi tidak ditemukan."});
-  const { moduleId, title, type, sourceType, sourceUrl, duration, totalPages, archived } = req.body;
-  const m = await prisma.material.update({ where:{id:req.params.id}, data: { moduleId, title, type, sourceType, sourceUrl, duration: duration === "" ? null : duration, totalPages: totalPages === "" ? null : totalPages, ...(typeof archived === "boolean" ? { archived } : {}) } });
+  const { moduleId, title, type, sourceType, sourceUrl, duration, totalPages, archived, requireCompletionForDownload } = req.body;
+  const m = await prisma.material.update({ where:{id:req.params.id}, data: { moduleId, title, type, sourceType, sourceUrl, duration: duration === "" ? null : duration, totalPages: totalPages === "" ? null : totalPages, ...(typeof archived === "boolean" ? { archived } : {}), ...(typeof requireCompletionForDownload === "boolean" ? { requireCompletionForDownload } : {}) } });
   if (req.body.sourceUrl && req.body.sourceUrl !== existing.sourceUrl) await removeMaterialFileIfUnused(existing.sourceUrl);
   res.json(m);
 });
@@ -87,6 +87,7 @@ r.delete("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async 
 r.get("/:id/download", requireAuth as any, async (req:any,res)=>{
   const m = await prisma.material.findUnique({ where:{id:req.params.id}});
   if(!m) return res.status(404).json({message:"Not found"});
+  if (req.user.role === "MAHASISWA" && m.requireCompletionForDownload) { const progress = m.type === "VIDEO" ? await prisma.videoProgress.findUnique({ where: { userId_materialId: { userId: req.user.id, materialId: m.id } } }) : await prisma.slideProgress.findUnique({ where: { userId_materialId: { userId: req.user.id, materialId: m.id } } }); if (!progress || progress.percent < 100) return res.status(403).json({ message: "Selesaikan membaca materi hingga 100% sebelum download." }); }
   await prisma.materialDownload.create({ data:{ userId:req.user.id, materialId:m.id }});
   // if upload file, stream it; if youtube/drive, redirect
   if(m.sourceType==="upload" && m.sourceUrl.startsWith("/uploads/")){

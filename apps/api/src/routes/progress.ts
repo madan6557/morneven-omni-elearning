@@ -105,18 +105,21 @@ r.get("/rekap/:courseId/student/:studentId", requireAuth as any, async (req: any
   if (!enrollment) return res.status(404).json({ message: "Mahasiswa tidak terdaftar pada matkul ini." });
   const course = await prisma.course.findUnique({
     where: { id: req.params.courseId },
-    include: { modules: { orderBy: { order: "asc" }, include: { materials: { orderBy: { order: "asc" } }, assignments: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] }, quizzes: { orderBy: [{ order: "asc" }, { createdAt: "asc" }], include: { questions: { orderBy: { order: "asc" }, select: { id: true, text: true, options: true, correctIndex: true, points: true, imageUrl: true } } } } } } } as any,
+    include: { modules: { orderBy: { order: "asc" }, include: { materials: { orderBy: { order: "asc" } }, assignments: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] }, quizzes: { orderBy: [{ order: "asc" }, { createdAt: "asc" }], include: { questions: { orderBy: { order: "asc" }, select: { id: true, type: true, text: true, options: true, correctIndex: true, points: true, imageUrl: true } } } } } } } as any,
   });
   if (!course) return res.status(404).json({ message: "course not found" });
   const materialIds = course.modules.flatMap((m: any) => m.materials.map((item: any) => item.id));
   const quizIds = course.modules.flatMap((m: any) => m.quizzes.map((item: any) => item.id));
-  const [videos, slides, downloads, attempts] = await Promise.all([
+  const assignmentIds = course.modules.flatMap((m: any) => m.assignments.map((item: any) => item.id));
+  const [videos, slides, downloads, attempts, assignmentSubmissions] = await Promise.all([
     prisma.videoProgress.findMany({ where: { userId: req.params.studentId, materialId: { in: materialIds } } }),
     prisma.slideProgress.findMany({ where: { userId: req.params.studentId, materialId: { in: materialIds } } }),
     prisma.materialDownload.findMany({ where: { userId: req.params.studentId, materialId: { in: materialIds } } }),
-    prisma.quizAttempt.findMany({ where: { userId: req.params.studentId, quizId: { in: quizIds } }, orderBy: { startedAt: "desc" } }),
+    prisma.quizAttempt.findMany({ where: { userId: req.params.studentId, quizId: { in: quizIds } }, include: { answerGrades: true }, orderBy: { startedAt: "desc" } }),
+    prisma.assignmentSubmission.findMany({ where: { userId: req.params.studentId, assignmentId: { in: assignmentIds } } }),
   ]);
-  res.json({ course: { id: course.id, title: course.title }, student: enrollment.user, modules: course.modules, progress: { videos, slides, downloads }, attempts });
+  const modules = course.modules.map((module: any) => ({ ...module, quizzes: module.quizzes.map((quiz: any) => ({ ...quiz, questions: quiz.questions.map((question: any) => ({ ...question, options: JSON.parse(question.options || "[]") })) })) }));
+  res.json({ course: { id: course.id, title: course.title }, student: enrollment.user, modules, progress: { videos, slides, downloads }, attempts, assignmentSubmissions });
 });
 
 // integration export (API_KEY)
