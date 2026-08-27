@@ -12,7 +12,7 @@ Dokumen ini adalah referensi operasional untuk mahasiswa, dosen, dan admin. Labe
 | Mengumpulkan tugas | ✓ | - | - |
 | Mengelola mata kuliah, modul, materi, tugas, quiz | - | ✓ | ✓ |
 | Melihat rekap dan menilai | - | ✓ | ✓ |
-| Mengelola user | - | - | ✓ |
+| Mengelola user, edit data, dan reset password | - | - | ✓ |
 | Backup/restore dan integrasi | - | - | ✓ |
 
 Server tetap memvalidasi role pada setiap endpoint. Mengetahui alamat URL tidak memberikan akses tambahan.
@@ -40,7 +40,7 @@ Untuk arti istilah secara cepat, buka artikel **Glosarium istilah OMNI** pada me
 3. Gunakan tombol tema untuk mode terang/gelap.
 4. Tekan Keluar pada perangkat bersama.
 
-Reset password saat ini dilakukan oleh Admin. Jangan membagikan password atau token sesi.
+Reset password saat ini dilakukan oleh Admin. User juga dapat mengganti password sendiri melalui panel **Akun aktif → Ganti password**. Password baru minimal 6 karakter. Jangan membagikan password atau token sesi.
 
 ## 4. Panduan mahasiswa
 
@@ -133,7 +133,11 @@ Buka **Rekap** atau submission tugas. Periksa file/link, beri nilai dan feedback
 
 ## 6. Panduan admin
 
-Admin memiliki seluruh kemampuan dosen, ditambah membuat/mengelola user, mengatur role, mengelola semua assignment dosen/enrollment mahasiswa, backup ZIP, restore, storage, SSO, API key, dan export integrasi.
+Admin memiliki seluruh kemampuan dosen, ditambah membuat/mengelola user, mengedit NIM/identifier, nama dan role, mengganti password user, menghapus akun lain, mengatur role, mengelola semua assignment dosen/enrollment mahasiswa, backup ZIP, restore, storage, SSO, API key, dan export integrasi. Akun admin yang sedang login tidak dapat dihapus.
+
+### Pengelolaan akun dan aktivitas
+
+Pada **Kelola User**, Admin dapat memilih **Edit**, **Password**, atau **Hapus**. Penghapusan akun aktif yang sedang digunakan ditolak oleh server. Status **Online** berarti terdapat aktivitas dalam lima menit terakhir; kolom **Terakhir akses** menunjukkan waktu aktivitas terakhir yang tercatat. Data aktivitas ini hanya tersedia untuk Admin.
 
 ### Backup dan restore
 
