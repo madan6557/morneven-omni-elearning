@@ -105,6 +105,8 @@ Mahasiswa yang belum mulai setelah jadwal tutup tidak dapat memulai. Timer dival
 
 Hasil dapat HIDDEN, MANUAL, atau SCHEDULED. Sebelum dipublikasikan, mahasiswa hanya melihat status menunggu hasil. Jawaban benar tidak dibocorkan sebelum diizinkan.
 
+Untuk publikasi manual, dosen/admin membuka `Kelola → pilih mata kuliah → pilih modul → Quiz dan soal/Bank soal`, lalu memilih `Edit` pada quiz. Pada field `Publikasi nilai`, pilih `Manual` dan tekan `Simpan`. Setelah kembali ke daftar, tekan tombol `Publikasikan hasil` pada quiz yang berstatus Manual dan konfirmasi bila diminta. Untuk UTS/UAS, tombol yang sama tersedia pada daftar Bank soal modul ujian. Tombol publikasi hanya tersedia untuk ADMIN atau DOSEN yang berwenang; mahasiswa baru dapat melihat nilai setelah publikasi.
+
 ## 5. Panduan dosen
 
 ### Mata kuliah dan modul
