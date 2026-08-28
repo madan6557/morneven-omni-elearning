@@ -14,7 +14,7 @@ Panduan operasional berdasarkan role tersedia di [USER_GUIDE.md](./USER_GUIDE.md
 - Progress video, slide, download, attempt, dan submission selalu terisolasi berdasarkan `userId` aktif.
 - `isOpen`, `availableFrom`, dan `availableUntil` mengatur ketersediaan konten. Sebelum tersedia, mahasiswa hanya menerima preview aman; detail, attachment, progress, download, submit, dan start attempt ditolak server.
 - `deadline` hanya membatasi pengumpulan tugas atau pengiriman jawaban quiz. `archive` menyembunyikan item dari mahasiswa tanpa menghapusnya.
-- UTS/UAS adalah modul khusus; `Quiz.kind` hanya `QUIZ`, `PRETEST`, dan `POSTTEST`. Hasil ujian mendukung HIDDEN, MANUAL, dan SCHEDULED.
+- UTS/UAS adalah modul khusus; `Quiz.kind` hanya `QUIZ`, `PRETEST`, dan `POSTTEST`. Hasil ujian mendukung AUTO (langsung), HIDDEN, MANUAL, dan SCHEDULED.
 - Nilai API harus finite atau `null`; nilai kosong ditampilkan sebagai **Belum dinilai**, bukan `NaN`.
 
 Perubahan schema atau endpoint membutuhkan migration dan redeploy backend serta frontend. Sebelum deployment, buat backup database/storage, jalankan Prisma generate dan migrate deploy, lalu smoke-test login, course, materi, tugas, quiz, rekap, Help, dan health check.

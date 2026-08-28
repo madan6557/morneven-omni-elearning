@@ -103,7 +103,7 @@ Mahasiswa yang belum mulai setelah jadwal tutup tidak dapat memulai. Timer dival
 
 ### Hasil
 
-Hasil dapat HIDDEN, MANUAL, atau SCHEDULED. Sebelum dipublikasikan, mahasiswa hanya melihat status menunggu hasil. Jawaban benar tidak dibocorkan sebelum diizinkan.
+Hasil memiliki empat mode. `AUTO` (default) langsung menampilkan hasil setelah mahasiswa selesai mengirim jawaban. `HIDDEN` menyimpan hasil hanya untuk dosen/admin sampai dirilis. `MANUAL` menunggu tombol publikasi. `SCHEDULED` mengikuti waktu rilis. Jawaban benar tidak dibocorkan sebelum diizinkan.
 
 Untuk publikasi manual, dosen/admin membuka `Kelola → pilih mata kuliah → pilih modul → Quiz dan soal/Bank soal`, lalu memilih `Edit` pada quiz. Pada field `Publikasi nilai`, pilih `Manual` dan tekan `Simpan`. Setelah kembali ke daftar, tekan tombol `Publikasikan hasil` pada quiz yang berstatus Manual dan konfirmasi bila diminta. Untuk UTS/UAS, tombol yang sama tersedia pada daftar Bank soal modul ujian. Tombol publikasi hanya tersedia untuk ADMIN atau DOSEN yang berwenang; mahasiswa baru dapat melihat nilai setelah publikasi.
 
@@ -129,7 +129,7 @@ Gunakan **Tambah**, **Edit**, **Arsipkan/Pulihkan**, dan tombol reorder pada det
 
 ### Konfigurasi evaluasi
 
-Field yang tersedia meliputi judul, jenis evaluasi, passing score, attempt, time limit, mode timer, jadwal buka, deadline, randomisasi soal/opsi, jumlah soal, tampilkan jawaban, dan publikasi hasil. Mode publikasi `HIDDEN` menyembunyikan hasil, `MANUAL` menunggu tombol publikasi, dan `SCHEDULED` mengikuti waktu rilis. UTS/UAS ditentukan oleh tipe modul, bukan pilihan kind Quiz.
+Field yang tersedia meliputi judul, jenis evaluasi, passing score, attempt, time limit, mode timer, jadwal buka, deadline, randomisasi soal/opsi, jumlah soal, tampilkan jawaban, dan publikasi hasil. Mode publikasi `AUTO` langsung menampilkan hasil setelah submit, `HIDDEN` menyembunyikan hasil, `MANUAL` menunggu tombol publikasi, dan `SCHEDULED` mengikuti waktu rilis. UTS/UAS ditentukan oleh tipe modul, bukan pilihan kind Quiz.
 
 Pilihan ganda membutuhkan minimal dua opsi dan jawaban benar. Essay tidak membutuhkan opsi maupun correctIndex. Gambar dapat berasal dari URL atau upload gambar valid.
 

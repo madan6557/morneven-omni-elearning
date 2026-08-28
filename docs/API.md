@@ -143,7 +143,7 @@ Browser menggunakan cookie `omni_session` HttpOnly; Bearer token tetap didukung 
 `Bearer` (MAHASISWA hanya self, DOSEN semua)
 
 ### PATCH /api/quizzes/:id/result-release
-`ADMIN/DOSEN` mengatur `resultReleaseMode` (`HIDDEN`, `MANUAL`, `SCHEDULED`), `resultReleaseAt`, dan `publish`. Mode HIDDEN tidak menampilkan hasil kepada mahasiswa.
+`ADMIN/DOSEN` mengatur `resultReleaseMode` (`AUTO`, `HIDDEN`, `MANUAL`, `SCHEDULED`), `resultReleaseAt`, dan `publish`. Mode AUTO langsung membuat hasil terlihat setelah submit. Mode HIDDEN tidak menampilkan hasil kepada mahasiswa.
 
 ### PATCH /api/quizzes/:id/schedule
 `ADMIN/DOSEN` mengatur `isOpen`, `availableFrom`, `availableUntil`, `deadline`, dan `timerMode` (`INDEPENDENT` atau `SYNC_DEADLINE`).

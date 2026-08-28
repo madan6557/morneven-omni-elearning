@@ -200,7 +200,7 @@ model Quiz {
   randomizeQuestions  Boolean   @default(false)
   randomizeOptions    Boolean   @default(false)
   questionCount       Int?
-  resultReleaseMode   String    @default("HIDDEN") // HIDDEN | MANUAL | SCHEDULED
+  resultReleaseMode   String    @default("AUTO") // AUTO | HIDDEN | MANUAL | SCHEDULED
   resultReleaseAt     DateTime?
   resultPublishedAt   DateTime?
   resultPublishedById String?

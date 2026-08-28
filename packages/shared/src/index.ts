@@ -30,7 +30,7 @@ export const CreateQuizSchema = z.object({
   randomizeQuestions: z.boolean().default(false),
   randomizeOptions: z.boolean().default(false),
   questionCount: z.number().int().positive().nullable().optional(),
-  resultReleaseMode: z.enum(["HIDDEN", "MANUAL", "SCHEDULED"]).default("HIDDEN"),
+  resultReleaseMode: z.enum(["AUTO", "HIDDEN", "MANUAL", "SCHEDULED"]).default("AUTO"),
   resultReleaseAt: z.string().datetime().nullable().optional(),
   isOpen: z.boolean().default(true),
   availableFrom: z.string().datetime().nullable().optional(),
