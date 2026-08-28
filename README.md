@@ -70,6 +70,8 @@ pnpm --filter api build
 
 ## Deploy Nanti
 - Ganti `DATABASE_URL` ke Postgres (Neon/Supabase), `CORS_ORIGIN`, `JWT_SECRET`, `API_KEY`
+- Railway sudah dikonfigurasi otomatis memakai **Railpack**: build, pre-deploy schema sync PostgreSQL, start API, dan health check. Konfigurasi ada di `railway.json`.
+- Untuk Railway saat ini gunakan schema sync `prisma db push --skip-generate`; migration repository masih SQLite dan belum kompatibel langsung dengan `prisma migrate deploy` PostgreSQL.
 - Upload: `UPLOAD_DIR` → ganti `saveFile()` ke R2/S3 (1 fungsi)
 - FE `VITE_API_URL` → URL BE
 

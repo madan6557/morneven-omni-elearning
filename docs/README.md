@@ -140,6 +140,7 @@ pnpm --filter @repo/db seed
 - `apps/web/vercel.json` sudah ada `rewrites: [{source:"/(.*)", destination:"/index.html"}]` untuk SPA `/login` 404
 
 ### BE Railway (`apps/api`)
+- Config Railway sekarang memakai **Railpack** dan otomatis menjalankan build, pre-deploy schema sync, start API, serta health check. Seed tidak dijalankan otomatis saat deploy agar data production tidak berubah tanpa sengaja.
 - Railway → New Project → Deploy from GitHub → Service `api` (Root kosong, pakai `railway.json` di root)
 - Add **Postgres** plugin → `DATABASE_URL` auto `${{Postgres.DATABASE_URL}}`
 - Variables:
@@ -153,7 +154,7 @@ pnpm --filter @repo/db seed
 - `railway.json` build: `sed sqlite→postgresql && prisma generate && pnpm --filter api build`; deploy: `sed + generate + prisma db push --accept-data-loss + seed || true; pnpm --filter api start`, healthcheck `/api/health`
 - Volume: Railway → Service `api` → Settings → Volumes → Mount `/app/apps/api/uploads` Size `500MB` (Live resize)
 
-**Prod Postgres:** `prisma migrate deploy` via `railway.json` deploy, `provider` di-switch `sed` saat build/deploy.
+**Catatan Postgres:** migration repository saat ini berformat SQLite, sehingga Railway memakai `prisma db push --skip-generate` pada pre-deploy setelah provider schema diganti ke PostgreSQL. Jangan menjalankan `prisma migrate deploy` sebelum baseline migration PostgreSQL dibuat.
 
 ---
 
@@ -203,9 +204,9 @@ Semua `requireAuth`, `requireRole`, `requireApiKey` di `apps/api/src/middleware/
 
 - `404 /login` → Vercel `apps/web/vercel.json` rewrites belum deploy, tunggu redeploy `5448aff`.
 - `CORS No Access-Control-Allow-Origin` → `CORS_ORIGIN` di Railway harus `https://omni.morneven.com` tanpa `"` (sudah handle di `app.ts:13`).
-- `P1001 Can't reach DB` → `prisma migrate` di build (build tidak bisa jangkau `postgres.railway.internal`), sudah fix `railway.json` pindah `migrate` ke `deploy`.
+- `P1001 Can't reach DB` → pastikan `DATABASE_URL` tersedia pada service API; schema sync dijalankan pada pre-deploy karena build tidak dapat menjangkau database private Railway.
 - `P1012 empty DATABASE_URL` → Railway Variables `DATABASE_URL=${{Postgres.DATABASE_URL}}` tanpa `"` dan service `Postgres` Online.
-- `P3019 provider sqlite ≠ postgresql` → `railway.json` sekarang `sed migration_lock.toml` + `db push`.
+- `P3019 provider sqlite ≠ postgresql` → config Railway mengganti provider schema ke PostgreSQL lalu memakai `db push`; migration SQLite belum boleh dijalankan langsung pada PostgreSQL.
 - `502 Bad Gateway` di `POST /api/auth/login` → cek **Deploy Logs** `prisma` error sebelum `API listening`.
 
 ---
