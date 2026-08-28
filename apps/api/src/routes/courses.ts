@@ -6,28 +6,26 @@ import { requireAuth, requireRole } from "../middleware/auth.js";
 import { denyIfNoCourseAccess } from "../lib/courseAccess.js";
 import { audit } from "../lib/audit.js";
 import { notifyCourseStudents } from "../lib/notifications.js";
+import { getContentAvailability, contentPreview } from "../lib/contentAvailability.js";
 const r = Router();
 const uploadRoot = path.resolve(process.env.UPLOAD_DIR || "./uploads");
-const removeLocalFileIfUnused = async (url: string | null | undefined, kind: "material" | "question") => {
+const removeLocalFileIfUnused = async (url: string | null | undefined, kind: "material" | "question" | "submission") => {
   if (!url?.startsWith("/uploads/")) return;
   const filePath = path.resolve(uploadRoot, url.slice("/uploads/".length));
   if (!filePath.startsWith(`${uploadRoot}${path.sep}`)) return;
-  const count = kind === "material" ? await prisma.material.count({ where: { sourceUrl: url } }) : await prisma.question.count({ where: { imageUrl: url } });
+  const count = kind === "material" ? await prisma.material.count({ where: { sourceUrl: url } }) : kind === "question" ? await prisma.question.count({ where: { imageUrl: url } }) : await prisma.assignmentSubmission.count({ where: { fileUrl: url } });
   if (!count && fs.existsSync(filePath)) await fs.promises.unlink(filePath);
 };
 
 function hideAnswerKeys(course: any) {
   return {
     ...course,
+    assignments: course.assignments?.filter((item: any) => !item.archived).map((item: any) => ({ ...contentPreview(item, "ASSIGNMENT"), description: getContentAvailability(item) === "AVAILABLE" ? item.description : null, deadline: item.deadline || null })),
     modules: course.modules?.map((module: any) => ({
       ...module,
-      quizzes: module.quizzes?.map((quiz: any) => ({
-        ...quiz,
-        questions: quiz.questions?.map((question: any) => {
-          const { correctIndex, ...safeQuestion } = question;
-          return safeQuestion;
-        })
-      }))
+      materials: module.materials?.filter((item: any) => !item.archived).map((item: any) => ({ ...contentPreview(item, "MATERIAL"), type: item.type, sourceType: item.sourceType, duration: item.duration, totalPages: item.totalPages, requireCompletionForDownload: item.requireCompletionForDownload })),
+      assignments: module.assignments?.filter((item: any) => !item.archived).map((item: any) => ({ ...contentPreview(item, "ASSIGNMENT"), description: getContentAvailability(item) === "AVAILABLE" ? item.description : null, deadline: item.deadline || null })),
+      quizzes: module.quizzes?.filter((item: any) => !item.archived).map((quiz: any) => ({ ...contentPreview(quiz, "QUIZ"), kind: quiz.kind, passingScore: quiz.passingScore, deadline: quiz.deadline || null, attemptLimit: quiz.attemptLimit, resultReleaseMode: quiz.resultReleaseMode, questions: (quiz.questions || []).map((question: any) => ({ id: question.id, type: question.type })) }))
     }))
   };
 }
@@ -52,8 +50,10 @@ r.get("/:id", requireAuth as any, async (req: any, res) => {
 });
 
 r.post("/", requireAuth as any, requireRole("ADMIN") as any, async (req, res) => {
-  const { title, description } = req.body;
-  if (!title) return res.status(400).json({ message: "title required" });
+  const title = String(req.body.title || "").trim();
+  const description = req.body.description === undefined || req.body.description === null ? null : String(req.body.description);
+  if (title.length < 2 || title.length > 200) return res.status(400).json({ message: "Judul mata kuliah harus 2 sampai 200 karakter." });
+  if (description !== null && description.length > 20000) return res.status(400).json({ message: "Deskripsi mata kuliah maksimal 20.000 karakter." });
   const c = await prisma.course.create({ data: { title, description } });
   void audit((req as any).user.id, "CREATE", "Course", c.id);
   res.status(201).json(c);
@@ -61,12 +61,17 @@ r.post("/", requireAuth as any, requireRole("ADMIN") as any, async (req, res) =>
 
 r.put("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
   if (await denyIfNoCourseAccess((req as any).user, req.params.id)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
-  const c = await prisma.course.update({ where: { id: req.params.id }, data: req.body });
+  const title = req.body.title === undefined ? undefined : String(req.body.title).trim();
+  const description = req.body.description === undefined || req.body.description === null ? req.body.description : String(req.body.description);
+  if (title !== undefined && (title.length < 2 || title.length > 200)) return res.status(400).json({ message: "Judul mata kuliah harus 2 sampai 200 karakter." });
+  if (description !== undefined && description !== null && description.length > 20000) return res.status(400).json({ message: "Deskripsi mata kuliah maksimal 20.000 karakter." });
+  if (title === undefined && description === undefined) return res.status(400).json({ message: "Tidak ada data mata kuliah yang diubah." });
+  const c = await prisma.course.update({ where: { id: req.params.id }, data: { ...(title !== undefined ? { title } : {}), ...(description !== undefined ? { description } : {}) } });
   void audit((req as any).user.id, "UPDATE", "Course", c.id);
   res.json(c);
 });
 
-r.delete("/:id", requireAuth as any, requireRole("ADMIN") as any, async (req, res) => { const course = await prisma.course.findUnique({ where: { id: req.params.id }, include: { modules: { include: { materials: true, quizzes: { include: { questions: true } } } } } }); if (!course) return res.status(404).json({ message: "Mata kuliah tidak ditemukan." }); await prisma.course.delete({ where: { id: req.params.id } }); const files = course.modules.flatMap((module) => [...module.materials.map((item) => ({ url: item.sourceUrl, kind: "material" as const })), ...module.quizzes.flatMap((quiz) => quiz.questions.map((question) => ({ url: question.imageUrl, kind: "question" as const })))]); await Promise.all(files.map((file) => removeLocalFileIfUnused(file.url, file.kind))); res.json({ ok: true }); });
+r.delete("/:id", requireAuth as any, requireRole("ADMIN") as any, async (req, res) => { const course = await prisma.course.findUnique({ where: { id: req.params.id }, include: { modules: { include: { materials: true, assignments: { include: { submissions: { select: { fileUrl: true } } } }, quizzes: { include: { questions: true } } } } } }); if (!course) return res.status(404).json({ message: "Mata kuliah tidak ditemukan." }); await prisma.course.delete({ where: { id: req.params.id } }); const files = course.modules.flatMap((module) => [...module.materials.map((item) => ({ url: item.sourceUrl, kind: "material" as const })), ...module.assignments.flatMap((assignment) => assignment.submissions.map((submission) => ({ url: submission.fileUrl, kind: "submission" as const }))), ...module.quizzes.flatMap((quiz) => quiz.questions.map((question) => ({ url: question.imageUrl, kind: "question" as const })))]); await Promise.all(files.map((file) => removeLocalFileIfUnused(file.url, file.kind))); res.json({ ok: true }); });
 
 // modules
 r.use("/modules/:id", requireAuth as any, async (req: any, res, next) => { const module = await prisma.module.findUnique({ where: { id: req.params.id }, select: { courseId: true } }); if (!module) return res.status(404).json({ message: "Modul tidak ditemukan." }); if (await denyIfNoCourseAccess(req.user, module.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." }); next(); });
@@ -75,15 +80,22 @@ r.post("/:courseId/modules", requireAuth as any, requireRole("ADMIN","DOSEN") as
   const { title, order, type = "REGULAR" } = req.body;
   if (!title?.trim() || !["REGULAR", "UTS", "UAS"].includes(type)) return res.status(400).json({ message: "Judul dan tipe modul tidak valid." });
   if ((type === "UTS" || type === "UAS") && await prisma.module.findFirst({ where: { courseId: req.params.courseId, type }, select: { id: true } })) return res.status(409).json({ message: `Mata kuliah ini sudah memiliki modul ${type}. Gunakan modul tersebut atau buat modul susulan reguler.` });
-  const m = await prisma.module.create({ data: { courseId: req.params.courseId, title: title.trim(), type, order: order ?? 0 } });
+  const last = await prisma.module.findFirst({ where: { courseId: req.params.courseId }, orderBy: [{ order: "desc" }, { createdAt: "desc" }], select: { order: true } });
+  const m = await prisma.module.create({ data: { courseId: req.params.courseId, title: title.trim(), type, order: (last?.order ?? 0) + 1 } });
   res.status(201).json(m);
 });
 
 r.put("/modules/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
-  const existing = await prisma.module.findUnique({ where: { id: req.params.id }, select: { courseId: true } });
+  const existing = await prisma.module.findUnique({ where: { id: req.params.id }, select: { courseId: true, type: true } });
   if (!existing) return res.status(404).json({ message: "Modul tidak ditemukan." });
   if (await denyIfNoCourseAccess((req as any).user, existing.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
-  const data = { ...(req.body.title !== undefined ? { title: String(req.body.title).trim() } : {}), ...(req.body.type !== undefined && ["REGULAR", "UTS", "UAS"].includes(req.body.type) ? { type: req.body.type } : {}) };
+  const title = req.body.title === undefined ? undefined : String(req.body.title).trim();
+  const type = req.body.type === undefined ? undefined : String(req.body.type).toUpperCase();
+  if (title !== undefined && (title.length < 2 || title.length > 200)) return res.status(400).json({ message: "Judul modul harus 2 sampai 200 karakter." });
+  if (type !== undefined && !["REGULAR", "UTS", "UAS"].includes(type)) return res.status(400).json({ message: "Tipe modul tidak valid." });
+  if (type && type !== "REGULAR" && await prisma.module.findFirst({ where: { courseId: existing.courseId, type, id: { not: req.params.id } }, select: { id: true } })) return res.status(409).json({ message: `Mata kuliah ini sudah memiliki modul ${type}.` });
+  if (title === undefined && type === undefined) return res.status(400).json({ message: "Tidak ada data modul yang diubah." });
+  const data = { ...(title !== undefined ? { title } : {}), ...(type !== undefined ? { type } : {}) };
   const m = await prisma.module.update({ where: { id: req.params.id }, data });
   res.json(m);
 });
@@ -132,7 +144,7 @@ r.patch("/modules/:moduleId/content/reorder", requireAuth as any, requireRole("A
   res.json({ ok: true });
 });
 
-r.delete("/modules/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => { const module = await prisma.module.findUnique({ where: { id: req.params.id }, include: { materials: true, quizzes: { include: { questions: true } } } }); if (!module) return res.status(404).json({ message: "Modul tidak ditemukan." }); await prisma.module.delete({ where: { id: req.params.id } }); const files = [...module.materials.map((item) => ({ url: item.sourceUrl, kind: "material" as const })), ...module.quizzes.flatMap((quiz) => quiz.questions.map((question) => ({ url: question.imageUrl, kind: "question" as const })))]; await Promise.all(files.map((file) => removeLocalFileIfUnused(file.url, file.kind))); res.json({ ok: true }); });
+r.delete("/modules/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => { const module = await prisma.module.findUnique({ where: { id: req.params.id }, include: { materials: true, assignments: { include: { submissions: { select: { fileUrl: true } } } }, quizzes: { include: { questions: true } } } }); if (!module) return res.status(404).json({ message: "Modul tidak ditemukan." }); await prisma.module.delete({ where: { id: req.params.id } }); const files = [...module.materials.map((item) => ({ url: item.sourceUrl, kind: "material" as const })), ...module.assignments.flatMap((assignment) => assignment.submissions.map((submission) => ({ url: submission.fileUrl, kind: "submission" as const }))), ...module.quizzes.flatMap((quiz) => quiz.questions.map((question) => ({ url: question.imageUrl, kind: "question" as const })))]; await Promise.all(files.map((file) => removeLocalFileIfUnused(file.url, file.kind))); res.json({ ok: true }); });
 
 // course instructors — one course may have multiple dosen
 r.get("/:id/instructors", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (req, res) => {
@@ -158,6 +170,8 @@ r.post("/:id/enroll", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, 
   const uid = userId;
   if (!uid) return res.status(400).json({ message: "userId wajib diisi." });
   if (await denyIfNoCourseAccess(req.user, req.params.id)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
+  const student = await prisma.user.findFirst({ where: { id: uid, role: "MAHASISWA" }, select: { id: true } });
+  if (!student) return res.status(400).json({ message: "userId harus merupakan akun mahasiswa." });
   const e = await prisma.enrollment.upsert({ where: { userId_courseId: { userId: uid, courseId: req.params.id } }, update: {}, create: { userId: uid, courseId: req.params.id } });
   void audit(req.user.id, "ENROLL", "Course", req.params.id, { userId: uid });
   res.json(e);

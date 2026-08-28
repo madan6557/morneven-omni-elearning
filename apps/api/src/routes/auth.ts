@@ -73,7 +73,9 @@ r.get("/users", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (
     prisma.user.findMany({ where, ...(paginated ? { skip, take } : {}), select: { id: true, nim: true, name: true, role: true, createdAt: true, lastSeenAt: true }, orderBy: { createdAt: "desc" } }),
     prisma.user.count({ where }),
   ]);
-  const withPresence = users.map((user) => ({ ...user, online: Boolean(user.lastSeenAt && Date.now() - user.lastSeenAt.getTime() < 5 * 60 * 1000) }));
+  const withPresence = users.map((user) => req.user.role === "ADMIN"
+    ? { ...user, online: Boolean(user.lastSeenAt && Date.now() - user.lastSeenAt.getTime() < 5 * 60 * 1000) }
+    : { id: user.id, nim: user.nim, name: user.name, role: user.role, createdAt: user.createdAt });
   res.json(paginated ? { items: withPresence, page, limit: take, total, totalPages: Math.ceil(total / take) } : withPresence);
 });
 

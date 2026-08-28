@@ -28,6 +28,7 @@ export function requireRole(...roles: string[]) {
 }
 export function requireApiKey(req: Request, res: Response, next: NextFunction) {
   const key = req.headers["x-api-key"] as string;
-  if (key !== (process.env.API_KEY || "dev-api-key-change-me")) return res.status(401).json({ message: "Invalid API key" });
+  const expected = process.env.API_KEY || (process.env.NODE_ENV === "production" ? "" : "dev-api-key-change-me");
+  if (!expected || key !== expected) return res.status(401).json({ message: "Invalid API key" });
   next();
 }

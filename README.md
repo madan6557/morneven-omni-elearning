@@ -2,7 +2,7 @@
 
 > **Dokumentasi lengkap:** `docs/README.md` · **Integrasi SI Utama:** `docs/INTEGRATION.md` · **API:** `docs/API.md`
 
-Monorepo `pnpm workspaces + Turborepo` untuk kolaborasi 2 dev (FE Vite, BE Express). Goal: materi tersampaikan & progress terlacak (download, slide, video, quiz pre/post).
+Monorepo `pnpm workspaces + Turborepo` untuk kolaborasi FE Vite dan BE Express. OMNI menyediakan mata kuliah bertingkat modul, materi, tugas, Quiz/Pretest/Posttest, modul ujian UTS/UAS, progress individual, penilaian, import Excel, backup, Help berbasis role, dan kontrol availability.
 
 ## Struktur
 ```
@@ -21,7 +21,7 @@ packages/
 - DB: `Course → Module → Material (VIDEO/PDF/PPT)` + `Enrollment` + `MaterialDownload` + `VideoProgress` + `SlideProgress` + `Quiz/Question/QuizAttempt`
 - Auth: NIM/password (bcrypt), role ADMIN/DOSEN/MAHASISWA, cookie JWT HttpOnly untuk browser, Bearer untuk integrasi
 - Tracking: `timeupdate` 5s (upload video), YT/Drive est., `viewedPages` JSON, download via `/download` endpoint
-- Quiz: PG 4 opsi, auto-nilai, pretest/posttest per modul
+- Quiz: pilihan ganda dinamis dan essay, auto/manual grading, attempt, timer, jadwal, publikasi nilai, dan gambar soal
 
 ## Quick Start (Tanpa Docker — SQLite)
 ```bash
@@ -48,13 +48,13 @@ Course demo: `course-demo` dengan Modul 1 (YT video, upload video, PDF 12 hal), 
 - `GET /api/courses` | `GET /api/courses/:id` | `POST /api/courses` (ADMIN)
 - `POST /api/materials` | `POST /api/materials/upload` (multipart) | `GET /api/materials/:id` | `GET /api/materials/:id/download` (track)
 - `POST /api/progress/video` `{materialId,pos,duration}` | `POST /api/progress/slide` `{materialId,page}` | `GET /api/progress/course/:id` | `GET /api/progress/rekap/:id` (DOSEN)
-- `POST /api/quizzes` | `GET /api/quizzes` | `POST /api/quizzes/:id/start` | `POST /api/quizzes/:id/submit` `{answers}`
+- `POST /api/quizzes` | `GET /api/quizzes` | `POST /api/quizzes/:id/start` | `POST /api/quizzes/:id/submit` `{answers}` | result release, schedule, essay grading, import/template
 - `POST /api/integration/auth/sso` (JWT shared secret) | `GET /api/progress/integration/export/:courseId` (X-API-Key)
 - `GET /api/reports/courses/:courseId/export.xlsx` | `GET /api/reports/courses/:courseId/export.csv`
 - `GET /api/notifications` | `GET /api/calendar`
 
 ## FE Routes
-`/login`, `/` (dashboard), `/courses`, `/courses/:id`, `/material/:id` (video/pdf/ppt), `/quiz/:id`, `/rekap` (DOSEN), `/manage` (DOSEN), `/users` (ADMIN)
+`/login`, `/` (dashboard), `/courses`, `/courses/:id`, `/material/:id` (video/pdf/ppt), `/quiz/:id`, `/rekap` (DOSEN/ADMIN), `/manage` (DOSEN/ADMIN), `/users` (ADMIN), `/help` (semua user login)
 
 ## Integrasi SI Utama (Nanti)
 - `externalId` nullable di User/Course/Material — sync tanpa refactor

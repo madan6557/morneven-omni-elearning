@@ -2,7 +2,7 @@
 
 Base: `http://localhost:4000` / `https://morneven-omni-elearning-production.up.railway.app`
 
-Auth: `Authorization: Bearer <JWT>` (kecuali login, health, integration API_KEY)
+Auth: cookie sesi `omni_session` HttpOnly atau `Authorization: Bearer <JWT>` (kecuali login, health, integration API_KEY). Mahasiswa hanya menerima preview aman untuk konten yang belum tersedia.
 
 ---
 
@@ -40,7 +40,7 @@ Menghapus cookie sesi browser. Register publik dinonaktifkan di production kecua
 ### GET /api/courses/:id
 `Bearer` → `Course` dengan `modules order asc {materials order asc, quizzes {questions}}`
 
-### POST /api/courses (ADMIN)
+### POST /api/courses (ADMIN saja)
 `{title,description}` → 201
 
 ### POST /api/courses/:courseId/modules (DOSEN/ADMIN)
@@ -54,6 +54,8 @@ Menghapus cookie sesi browser. Register publik dinonaktifkan di production kecua
 ---
 
 ## Materials
+
+Konten materi, tugas, dan quiz mengikuti kontrak availability: `isOpen=false`, `availableFrom` di masa depan, atau `availableUntil` yang telah lewat membuat endpoint detail, file, progress, download, submit, dan start attempt mengembalikan `403 CONTENT_NOT_AVAILABLE` untuk mahasiswa. `deadline` hanya menutup aksi tugas/quiz; `archived=true` menyembunyikan item dari mahasiswa.
 
 ### POST /api/materials (DOSEN/ADMIN)
 ```json
@@ -139,6 +141,15 @@ Browser menggunakan cookie `omni_session` HttpOnly; Bearer token tetap didukung 
 
 ### GET /api/quizzes/:id/attempts
 `Bearer` (MAHASISWA hanya self, DOSEN semua)
+
+### PATCH /api/quizzes/:id/result-release
+`ADMIN/DOSEN` mengatur `resultReleaseMode` (`HIDDEN`, `MANUAL`, `SCHEDULED`), `resultReleaseAt`, dan `publish`. Mode HIDDEN tidak menampilkan hasil kepada mahasiswa.
+
+### PATCH /api/quizzes/:id/schedule
+`ADMIN/DOSEN` mengatur `isOpen`, `availableFrom`, `availableUntil`, `deadline`, dan `timerMode` (`INDEPENDENT` atau `SYNC_DEADLINE`).
+
+### PATCH /api/quizzes/attempts/:attemptId/questions/:questionId/grade
+`ADMIN/DOSEN` menilai jawaban essay dengan `{score,feedback}`. Nilai harus finite, minimal 0, dan tidak melebihi poin soal.
 
 ---
 

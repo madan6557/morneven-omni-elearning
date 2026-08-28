@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import fs from "fs";
-import { auth } from "./middleware/auth.js";
+import { auth, requireApiKey } from "./middleware/auth.js";
 import authRoutes from "./routes/auth.js";
 import courseRoutes from "./routes/courses.js";
 import materialRoutes from "./routes/materials.js";
@@ -25,9 +25,8 @@ export function createApp() {
   app.use(express.urlencoded({ extended: true }));
   app.use(auth as any);
 
-  // serve uploads
+  // Uploads are served through authenticated resource routes, never as a public directory.
   const uploadDir = process.env.UPLOAD_DIR || "./uploads";
-  app.use("/uploads", express.static(path.resolve(uploadDir)));
 
   app.get("/api/health", async (_req, res) => { const checks: any = { api: true, database: false, storage: false }; try { await prisma.$queryRaw`SELECT 1`; checks.database = true; } catch {} try { checks.storage = fs.existsSync(path.resolve(uploadDir)); } catch {} const ok = checks.database && checks.storage; res.status(ok ? 200 : 503).json({ ok, checks, time: new Date().toISOString() }); });
 
@@ -42,16 +41,17 @@ export function createApp() {
   app.use("/api/calendar", calendarRoutes);
   app.use("/api/reports", reportRoutes);
   // integration sso stub — ponytail: verify JWT shared secret
-  app.post("/api/integration/auth/sso", async (req,res)=>{
-    if (process.env.NODE_ENV === "production" && req.headers["x-api-key"] !== process.env.API_KEY) return res.status(401).json({ message: "Invalid API key" });
+  app.post("/api/integration/auth/sso", requireApiKey as any, async (req,res)=>{
     const { token } = req.body;
     if(!token) return res.status(400).json({message:"token required"});
     try{
       const { verifyToken } = await import("./lib/jwt.js");
       const payload = verifyToken(token);
+      const user = await prisma.user.findUnique({ where: { id: payload.id }, select: { id: true, nim: true, name: true, role: true, isActive: true, tokenVersion: true } });
+      if (!user || !user.isActive) return res.status(401).json({ message: "User SSO tidak aktif atau tidak ditemukan." });
       const { signToken } = await import("./lib/jwt.js");
-      const newTok = signToken(payload as any);
-      res.json({ token: newTok, user: payload });
+      const newTok = signToken({ id: user.id, nim: user.nim, role: user.role, tokenVersion: user.tokenVersion });
+      res.json({ token: newTok, user: { id: user.id, nim: user.nim, name: user.name, role: user.role } });
     } catch(e:any){ res.status(401).json({message:"invalid token"}); }
   });
 

@@ -122,7 +122,7 @@ function UploadPlayer({material, onProgress}:{material:any; onProgress?:any}){
         controls
         preload="metadata"
         className="w-full aspect-video bg-black rounded-xl"
-        src={material.sourceUrl}
+        src={material.sourceUrl?.startsWith("/") ? `${api.defaults.baseURL || window.location.origin}${material.sourceUrl}` : material.sourceUrl}
         onTimeUpdate={()=>{
           const v=ref.current; if(!v) return;
           if(v.currentTime - lastSent.current > 5){

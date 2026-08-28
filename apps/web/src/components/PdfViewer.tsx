@@ -33,7 +33,7 @@ export default function PdfViewer({ material, onProgress }: { material: any, onP
     }).catch(()=>{});
   };
 
-  const rawSrc = material.sourceUrl?.startsWith("/uploads/") ? (window.location.origin + material.sourceUrl) : material.sourceUrl;
+  const rawSrc = material.sourceUrl?.startsWith("/") ? `${api.defaults.baseURL || window.location.origin}${material.sourceUrl}` : material.sourceUrl;
   const src = isPPT && rawSrc?.startsWith("http") ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(rawSrc)}` : rawSrc;
 
   return (

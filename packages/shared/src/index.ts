@@ -32,12 +32,14 @@ export const CreateQuizSchema = z.object({
   questionCount: z.number().int().positive().nullable().optional(),
   resultReleaseMode: z.enum(["HIDDEN", "MANUAL", "SCHEDULED"]).default("HIDDEN"),
   resultReleaseAt: z.string().datetime().nullable().optional(),
+  isOpen: z.boolean().default(true),
   availableFrom: z.string().datetime().nullable().optional(),
+  availableUntil: z.string().datetime().nullable().optional(),
   deadline: z.string().datetime().nullable().optional(),
   questions: z.array(z.object({
     type: z.enum(["MULTIPLE_CHOICE", "ESSAY"]).default("MULTIPLE_CHOICE"),
     text: z.string().min(1),
-    options: z.array(z.string()).default([]),
+    options: z.array(z.string().trim().min(1, "Opsi tidak boleh kosong.")).default([]),
     correctIndex: z.number().int().min(0).nullable().optional(),
     points: z.number().finite().positive().default(10),
     order: z.number().int().positive().optional(),
@@ -45,6 +47,7 @@ export const CreateQuizSchema = z.object({
   }).superRefine((question, ctx) => { if (question.type === "MULTIPLE_CHOICE" && (question.options.length < 2 || question.correctIndex === null || question.correctIndex === undefined || question.correctIndex >= question.options.length)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Multiple choice wajib memiliki minimal 2 opsi dan jawaban benar." }); })).min(1)
 }).superRefine((quiz, ctx) => {
   if (quiz.availableFrom && quiz.deadline && new Date(quiz.deadline) < new Date(quiz.availableFrom)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["deadline"], message: "Deadline tidak boleh sebelum jadwal buka." });
+  if (quiz.availableFrom && quiz.availableUntil && new Date(quiz.availableUntil) < new Date(quiz.availableFrom)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["availableUntil"], message: "Jadwal tutup tidak boleh sebelum jadwal buka." });
   if (quiz.resultReleaseMode === "SCHEDULED" && !quiz.resultReleaseAt) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["resultReleaseAt"], message: "Jadwal publikasi wajib diisi untuk mode terjadwal." });
 });
 
@@ -65,9 +68,27 @@ export const CreateMaterialSchema = z.object({
   duration: z.number().finite().nonnegative().optional(),
   totalPages: z.number().int().positive().optional(),
   requireCompletionForDownload: z.boolean().optional(),
+  isOpen: z.boolean().default(true),
   availableFrom: z.string().datetime().nullable().optional(),
+  availableUntil: z.string().datetime().nullable().optional(),
   order: z.number().optional(),
+}).superRefine((material, ctx) => {
+  if (material.availableFrom && material.availableUntil && new Date(material.availableUntil) < new Date(material.availableFrom)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["availableUntil"], message: "Jadwal tutup tidak boleh sebelum jadwal buka." });
+});
+
+export const CreateAssignmentSchema = z.object({
+  courseId: z.string().min(1),
+  moduleId: z.string().min(1),
+  title: z.string().trim().min(2, "Judul tugas minimal 2 karakter.").max(200),
+  description: z.string().max(20000).nullable().optional(),
+  isOpen: z.boolean().default(true),
+  availableFrom: z.string().datetime().nullable().optional(),
+  availableUntil: z.string().datetime().nullable().optional(),
+  deadline: z.string().datetime().nullable().optional(),
+}).superRefine((assignment, ctx) => {
+  if (assignment.availableFrom && assignment.availableUntil && new Date(assignment.availableUntil) < new Date(assignment.availableFrom)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["availableUntil"], message: "Jadwal tutup tidak boleh sebelum jadwal buka." });
+  if (assignment.availableFrom && assignment.deadline && new Date(assignment.deadline) < new Date(assignment.availableFrom)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["deadline"], message: "Deadline tidak boleh sebelum jadwal buka." });
 });
 
 // pagination
-export const PaginationSchema = z.object({ page: z.coerce.number().default(1), limit: z.coerce.number().default(20) });
+export const PaginationSchema = z.object({ page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(100).default(25) });

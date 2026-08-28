@@ -16,6 +16,7 @@ export default function MaterialView(){
   const { showFeedback } = useFeedback();
   const { user } = useAuth();
   const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState("");
   useEffect(()=>{
     api.get(`/api/materials/${id}`).then(async r=>{
       setMat(r.data);
@@ -26,8 +27,9 @@ export default function MaterialView(){
         const current = r.data.type === "VIDEO" ? progress.data.videos?.find((item:any) => item.materialId === r.data.id)?.percent : progress.data.slides?.find((item:any) => item.materialId === r.data.id)?.percent;
         if (current !== undefined) setPct(current);
       }catch{}
-    }).catch(()=>{});
+    }).catch((requestError:any)=>setError(requestError.response?.data?.message || "Materi tidak dapat dibuka."));
   },[id]);
+  if(error) return <div className="mx-auto max-w-3xl space-y-4"><Link to="/courses" className="text-sm text-zinc-500">← Kembali ke mata kuliah</Link><div className="section-card" role="alert"><p className="eyebrow">Akses materi</p><h1 className="mt-2 text-xl font-bold">Materi belum dapat dibuka</h1><p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">{error}</p></div></div>;
   if(!mat) return <div>Loading...</div>;
 
   // nav next/prev
@@ -38,17 +40,13 @@ export default function MaterialView(){
     prev = all[idx-1]||null; next = all[idx+1]||null;
   }
 
-  const handleDownload=async()=>{
-    if (downloading) return;
+  const handleDownload=()=>{
+    if (downloading || !downloadReady) return;
     setDownloading(true);
-    try{
-      // hit tracking endpoint then open
-      window.open(`/api/materials/${mat.id}/download`, "_blank");
-      // optimistic log via fetch with auth
-      await api.get(`/api/materials/${mat.id}/download`).catch(()=>{});
-      showFeedback("Download berhasil dicatat.");
-    }catch{ showFeedback("Download gagal dicatat.", "error"); }
-    finally { setDownloading(false); }
+    const opened = window.open(`${api.defaults.baseURL || window.location.origin}/api/materials/${mat.id}/download`, "_blank", "noopener,noreferrer");
+    if (!opened) showFeedback("Izinkan pop-up browser untuk membuka materi.", "error");
+    else showFeedback("Download berhasil dicatat.");
+    window.setTimeout(() => setDownloading(false), 1000);
   };
   const downloadReady = !mat.requireCompletionForDownload || user?.role !== "MAHASISWA" || pct >= 100;
 
@@ -72,7 +70,6 @@ export default function MaterialView(){
         {(mat.type==="PDF" || mat.type==="PPT") && (
           <div className="mt-4 flex gap-2">
             <button disabled={downloading || !downloadReady} onClick={handleDownload} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-zinc-800 border dark:border-zinc-700 text-sm disabled:cursor-not-allowed disabled:opacity-50">{downloading ? <Spinner size={14} /> : "⬇"} {downloadReady ? (downloading ? "Mencatat..." : "Download & Catat Progress") : "Selesaikan materi terlebih dahulu"}</button>
-            <a href={mat.sourceUrl} target="_blank" rel="noreferrer" className="px-4 py-2 rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-sm">Buka File</a>
           </div>
         )}
       </div>

@@ -118,8 +118,10 @@ model Material {
   duration                     Int? // seconds for video
   totalPages                   Int? // for PDF
   archived                     Boolean   @default(false)
+  isOpen                       Boolean   @default(true)
   requireCompletionForDownload Boolean   @default(false)
   availableFrom                DateTime?
+  availableUntil               DateTime?
   order                        Int       @default(0)
   contentOrder                 Int       @default(0)
   externalId                   String?   @unique
@@ -204,6 +206,8 @@ model Quiz {
   resultPublishedById String?
   deadline            DateTime?
   availableFrom       DateTime?
+  availableUntil      DateTime?
+  isOpen              Boolean   @default(true)
   archived            Boolean   @default(false)
   order               Int       @default(0)
   contentOrder        Int       @default(0)
@@ -226,6 +230,8 @@ model Assignment {
   description   String?
   deadline      DateTime?
   availableFrom DateTime?
+  availableUntil DateTime?
+  isOpen        Boolean                @default(true)
   archived      Boolean                @default(false)
   order         Int                    @default(0)
   contentOrder  Int                    @default(0)

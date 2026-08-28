@@ -56,6 +56,18 @@ Video dijalankan langsung di player e-learning jika sumbernya mendukung. PDF/PPT
 
 Jika aturan completion aktif, video harus mencapai 100% atau seluruh halaman PDF/PPT harus selesai dibaca. Sebelum itu tombol download dinonaktifkan dan API menolak permintaan. Jika aturan nonaktif, download berjalan sesuai akses materi.
 
+### Status buka, jadwal, deadline, dan archive
+
+Pengaturan konten memiliki arti yang berbeda:
+
+- **Buka untuk mahasiswa** (`isOpen`): sakelar manual. Jika mati, mahasiswa hanya melihat preview aman.
+- **Jadwal mulai tersedia** (`availableFrom`): konten baru dapat dibuka setelah waktu server tercapai. Kosong berarti langsung tersedia.
+- **Jadwal akses berakhir** (`availableUntil`): setelah waktu server tercapai, konten kembali menjadi preview aman. Kosong berarti tidak dibatasi jadwal akses.
+- **Deadline**: hanya batas pengumpulan tugas atau pengiriman jawaban quiz/ujian. Deadline kosong berarti tidak ada batas aksi kalender.
+- **Archive**: item disembunyikan dari mahasiswa tetapi tetap terlihat oleh admin/dosen dan dapat dipulihkan.
+
+Sebelum materi, tugas, atau quiz tersedia, mahasiswa tidak dapat melihat isi, player, soal, attachment, progress, download, submit, atau memulai attempt. Endpoint mengembalikan status `CONTENT_NOT_AVAILABLE` beserta preview aman. Semua waktu divalidasi menggunakan waktu server.
+
 ### Mengumpulkan tugas
 
 1. Buka tugas dari modul.
