@@ -45,7 +45,7 @@ export default function Quiz(){
         {result && (
           <div className={`mt-4 p-4 rounded-xl border dark:border-zinc-700 ${result.passed?"bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800":"bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800"}`}>
             <div className="font-bold">{result.passed?"Lulus ✓":"Belum Lulus"}</div>
-            <div className="text-sm">Skor: {Math.round(result.score)}% ({result.rawScore}/{result.maxScore} poin)</div>
+            <div className="text-sm">{typeof result.score === "number" && Number.isFinite(result.score) ? `Skor: ${Math.round(result.score)}% (${result.rawScore ?? "-"}/${result.maxScore ?? "-"} poin)` : result.resultStatus || "Hasil menunggu publikasi."}</div>
           </div>
         )}
       </div>

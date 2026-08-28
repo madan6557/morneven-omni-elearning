@@ -74,6 +74,7 @@ r.post("/:courseId/modules", requireAuth as any, requireRole("ADMIN","DOSEN") as
   if (await denyIfNoCourseAccess((req as any).user, req.params.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   const { title, order, type = "REGULAR" } = req.body;
   if (!title?.trim() || !["REGULAR", "UTS", "UAS"].includes(type)) return res.status(400).json({ message: "Judul dan tipe modul tidak valid." });
+  if ((type === "UTS" || type === "UAS") && await prisma.module.findFirst({ where: { courseId: req.params.courseId, type }, select: { id: true } })) return res.status(409).json({ message: `Mata kuliah ini sudah memiliki modul ${type}. Gunakan modul tersebut atau buat modul susulan reguler.` });
   const m = await prisma.module.create({ data: { courseId: req.params.courseId, title: title.trim(), type, order: order ?? 0 } });
   res.status(201).json(m);
 });
