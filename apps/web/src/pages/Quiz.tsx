@@ -30,6 +30,7 @@ export default function Quiz() {
   const [now, setNow] = useState(Date.now());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [startMessage, setStartMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const { showFeedback, requestConfirmation } = useFeedback();
 
@@ -44,13 +45,15 @@ export default function Quiz() {
       setAttempts(loadedAttempts);
       const submittedCount = loadedAttempts.filter((attempt: any) => attempt.submittedAt).length;
       const canStart = loadedQuiz.attemptLimit !== 0 && !(loadedQuiz.attemptLimit > 0 && submittedCount >= loadedQuiz.attemptLimit);
+      setStartMessage(canStart ? "" : loadedQuiz.attemptLimit === 0 ? "Quiz ini ditutup oleh pengelola." : `Batas attempt ${loadedQuiz.attemptLimit}x telah tercapai.`);
       if (canStart) {
         try {
           const started = await api.post(`/api/quizzes/${id}/start`);
           setActiveAttempt(started.data);
         } catch (reason: any) {
           const status = reason?.response?.status;
-          if (status !== 400 && status !== 403) throw reason;
+          if (status === 400 || status === 403) setStartMessage(reason?.response?.data?.message || "Quiz belum dapat dimulai saat ini.");
+          else throw reason;
         }
       }
       setError("");
@@ -112,6 +115,7 @@ export default function Quiz() {
       <p className="text-sm text-zinc-500">{quiz.questions?.length || 0} soal · Lulus {finiteNumber(quiz.passingScore) ?? 0}% · {quiz.attemptLimit === -1 ? "Attempt tak terbatas" : quiz.attemptLimit === 0 ? "Quiz ditutup" : `Batas ${quiz.attemptLimit}x`}{quiz.deadline ? ` · Deadline ${new Date(quiz.deadline).toLocaleString()}` : " · Tanpa deadline"}{quiz.timeLimit ? ` · Timer ${quiz.timeLimit} menit` : ""}</p>
       {remainingSeconds !== null && <div className={`rounded-xl border p-3 text-sm font-semibold ${timeExpired ? "border-red-200 bg-red-50 text-red-700" : "border-blue-200 bg-blue-50 text-blue-800"}`}>Waktu tersisa: {formatRemaining(remainingSeconds)}{timeExpired ? " · Waktu habis" : ""}</div>}
       {quiz.resultReleaseMode !== "HIDDEN" && <p className="text-xs text-zinc-500">Publikasi nilai: {quiz.resultReleaseMode === "SCHEDULED" ? quiz.resultReleaseAt ? `terjadwal ${new Date(quiz.resultReleaseAt).toLocaleString()}` : "terjadwal" : "manual oleh dosen/admin"}.</p>}
+      {!activeAttempt && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">{startMessage || "Quiz belum dapat dimulai saat ini."}</div>}
       {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       {result && <div className={`rounded-xl border p-4 ${result.resultStatus ? "border-blue-200 bg-blue-50 text-blue-800" : result.passed ? "border-green-200 bg-green-50 text-green-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}><p className="font-bold">{result.resultStatus || (result.passed ? "Lulus" : "Belum lulus")}</p><p className="text-sm">{result.resultStatus || `Skor: ${scoreText(result.score)} (${finiteNumber(result.rawScore) ?? 0}/${finiteNumber(result.maxScore) ?? 0} poin)`}</p></div>}
     </section>
