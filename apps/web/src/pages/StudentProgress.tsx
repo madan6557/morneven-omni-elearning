@@ -45,7 +45,7 @@ function QuizResult({ quiz, attempts }: any) {
   return <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold">{quiz.title}</p><p className="text-xs text-zinc-500">{attempts.length} attempt · passing {quiz.passingScore}%</p></div>{attempts.length === 0 ? <span className="text-xs text-zinc-500">Belum dikerjakan</span> : <span className="text-sm font-bold">Terbaik: {scores.length ? `${Math.max(...scores)}%` : "Belum dinilai"}</span>}</div>{attempts.map((attempt: any) => { const score = finiteScore(attempt.score); return <div key={attempt.id} className="mt-3 rounded-lg bg-zinc-50 p-3 text-sm dark:bg-zinc-800/70"><div className="flex items-center justify-between"><span>{new Date(attempt.submittedAt || attempt.startedAt).toLocaleString()}</span><span className={attempt.passed ? "text-emerald-600" : "text-red-600"}>{score === null ? "Belum dinilai" : `${Math.round(score)}%`} {attempt.passed ? <CheckCircle2 className="inline" size={15} /> : <XCircle className="inline" size={15} />}</span></div><div className="mt-2 space-y-2 text-xs text-zinc-600 dark:text-zinc-300">{quiz.questions.map((question: any) => <QuestionResult key={question.id} attempt={attempt} question={question} />)}</div></div>; })}</div>;
 }
 
-function QuestionResult({ attempt, question }: any) {
+function LegacyQuestionResult({ attempt, question }: any) {
   let answers: any[] = [];
   try { const parsed = JSON.parse(attempt.answers || "[]"); answers = Array.isArray(parsed) ? parsed : []; } catch { answers = []; }
   const answer = answers.find((item) => item.questionId === question.id);
@@ -69,3 +69,18 @@ function EssayGrade({ attemptId, question, answer, existing }: any) {
 }
 
 function Stat({ label, value, icon }: any) { return <div className="section-card"><div className="flex items-center gap-2 text-violet-600">{icon}<span className="text-xs text-zinc-500">{label}</span></div><p className="mt-2 text-2xl font-bold">{value}</p></div>; }
+
+function QuestionResult({ attempt, question }: any) {
+  let answers: any[] = [];
+  try {
+    const parsed = typeof attempt.answers === "string" ? JSON.parse(attempt.answers || "[]") : attempt.answers;
+    if (Array.isArray(parsed)) answers = parsed;
+    else if (parsed && Array.isArray(parsed.answers)) answers = parsed.answers;
+    else if (parsed && typeof parsed === "object") answers = Object.entries(parsed).map(([questionId, value]) => typeof value === "object" && value !== null ? { questionId, ...(value as any) } : { questionId, chosen: value });
+  } catch { answers = []; }
+  const answer = answers.find((item) => String(item.questionId) === String(question.id));
+  const chosen = answer?.chosen === undefined || answer?.chosen === null ? null : Number(answer.chosen);
+  const options = Array.isArray(question.options) ? question.options : [];
+  const answerLabel = chosen === null || chosen < 0 ? "Tidak dijawab" : options[chosen] || "Pilihan tidak valid";
+  return <div><p className="font-semibold">{question.text}</p>{question.type === "ESSAY" ? <EssayGrade attemptId={attempt.id} question={question} answer={answer} existing={attempt.answerGrades?.find((grade: any) => grade.questionId === question.id)} /> : <p>Jawaban: {answerLabel} · Kunci: {options[question.correctIndex] || "Tidak tersedia"} · {question.points} poin</p>}</div>;
+}
