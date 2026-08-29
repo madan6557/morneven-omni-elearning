@@ -124,6 +124,15 @@ function DrivePlayer({material, onProgress}:{material:any; onProgress?:any}){
 function UploadPlayer({material, onProgress}:{material:any; onProgress?:any}){
   const ref=useRef<HTMLVideoElement>(null);
   const lastSent=useRef(0);
+  const sendProgress = () => {
+    const video = ref.current;
+    if (!video) return;
+    const duration = Number(video.duration || material.duration || 0);
+    const position = Math.min(Number(video.currentTime || 0), duration || Number(video.currentTime || 0));
+    if (!Number.isFinite(duration) || duration < 1 || !Number.isFinite(position)) return;
+    lastSent.current = position;
+    api.post("/api/progress/video", { materialId: material.id, pos: Math.floor(position), duration: Math.floor(duration) }).then((response) => onProgress?.(response.data.percent)).catch(()=>{});
+  };
   useEffect(()=>{
     // resume lastPosition
     api.get(`/api/progress/course/${material.module?.courseId||"course-demo"}`).then(r=>{
@@ -132,6 +141,11 @@ function UploadPlayer({material, onProgress}:{material:any; onProgress?:any}){
         try{ ref.current.currentTime = v.lastPosition; lastSent.current=v.lastPosition; onProgress?.(v.percent);}catch{}
       }
     }).catch(()=>{});
+  },[material.id]);
+  useEffect(()=>{
+    const flush=()=>sendProgress();
+    window.addEventListener("pagehide", flush);
+    return ()=>window.removeEventListener("pagehide", flush);
   },[material.id]);
   return (
     <div className="space-y-2">
@@ -143,15 +157,10 @@ function UploadPlayer({material, onProgress}:{material:any; onProgress?:any}){
         src={material.sourceUrl?.startsWith("/") ? `${api.defaults.baseURL || window.location.origin}${material.sourceUrl}` : material.sourceUrl}
         onTimeUpdate={()=>{
           const v=ref.current; if(!v) return;
-          if(v.currentTime - lastSent.current > 5){
-            lastSent.current = v.currentTime;
-            api.post("/api/progress/video",{ materialId: material.id, pos: Math.floor(v.currentTime), duration: Math.floor(v.duration||material.duration||1)}).then(r=>onProgress?.(r.data.percent)).catch(()=>{});
-          }
+          if(v.currentTime - lastSent.current > 5) sendProgress();
         }}
-        onEnded={()=>{
-          const v=ref.current; if(!v) return;
-          api.post("/api/progress/video",{ materialId: material.id, pos: Math.floor(v.duration), duration: Math.floor(v.duration)}).then(r=>onProgress?.(r.data.percent)).catch(()=>{});
-        }}
+        onPause={sendProgress}
+        onEnded={sendProgress}
       />
       <p className="text-xs text-zinc-500 dark:text-zinc-400">Upload — presisi + resume {Math.floor(lastSent.current)}s</p>
     </div>
