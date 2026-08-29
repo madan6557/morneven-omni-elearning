@@ -5,7 +5,7 @@
     "buildCommand": "pnpm install --frozen-lockfile && node ../../scripts/prepare-railway-prisma.mjs && npx prisma generate --schema=../../packages/db/prisma/schema.prisma && pnpm build"
   },
   "deploy": {
-    "preDeployCommand": "node ../../scripts/prepare-railway-prisma.mjs && npx prisma db push --schema=../../packages/db/prisma/schema.prisma --skip-generate",
+    "preDeployCommand": "node ../../scripts/prepare-railway-prisma.mjs && node ../../scripts/railway-db-push.mjs",
     "startCommand": "pnpm start",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 100
