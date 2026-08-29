@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import api, { ytEmbed, driveEmbed } from "../lib/api";
+import api, { driveEmbed } from "../lib/api";
+
+const youtubeId = (value: string) => {
+  try {
+    const url = new URL(value);
+    if (url.hostname.includes("youtu.be")) return url.pathname.slice(1).split("/")[0];
+    if (url.pathname.startsWith("/embed/")) return url.pathname.split("/")[2] || "";
+    if (url.pathname.startsWith("/shorts/")) return url.pathname.split("/")[2] || "";
+    return url.searchParams.get("v") || "";
+  } catch { return ""; }
+};
 
 export default function VideoPlayer({ material, onProgress }: { material: any; onProgress?: (p:number)=>void }){
   const { sourceType, sourceUrl } = material;
@@ -14,9 +24,22 @@ function YouTubePlayer({material, onProgress}:{material:any; onProgress?:any}){
   const playerRef=useRef<any>(null);
   const intervalRef=useRef<any>(null);
   const lastSent=useRef(0);
+  const saving=useRef(false);
+
+  const sendProgress = () => {
+    const player = playerRef.current;
+    const cur = Number(player?.getCurrentTime?.() || 0);
+    const dur = Number(player?.getDuration?.() || material.duration || 0);
+    if (saving.current || !Number.isFinite(cur) || !Number.isFinite(dur) || dur < 1) return;
+    saving.current = true;
+    api.post("/api/progress/video", { materialId: material.id, pos: Math.floor(Math.min(cur, dur)), duration: Math.floor(dur) })
+      .then(r => { lastSent.current = cur; setSecs(Math.floor(cur)); onProgress?.(r.data.percent); })
+      .catch(() => {})
+      .finally(() => { saving.current = false; });
+  };
 
   useEffect(()=>{
-    const ytId = (()=>{ try{ const u=new URL(material.sourceUrl); if(u.hostname.includes("youtu.be")) return u.pathname.slice(1); return u.searchParams.get("v")||"";}catch{return ""}})();
+    const ytId = youtubeId(material.sourceUrl);
     if(!ytId) return;
     let cancelled=false;
 
@@ -41,20 +64,13 @@ function YouTubePlayer({material, onProgress}:{material:any; onProgress?:any}){
             if(e.data===YTState.PLAYING){
               if(intervalRef.current) clearInterval(intervalRef.current);
               intervalRef.current=setInterval(()=>{
-                const cur=playerRef.current?.getCurrentTime?.()||0;
-                const dur=playerRef.current?.getDuration?.()||material.duration||600;
-                if(cur - lastSent.current >= 5){
-                  lastSent.current=cur;
-                  setSecs(Math.floor(cur));
-                  api.post("/api/progress/video",{ materialId: material.id, pos: Math.floor(cur), duration: Math.floor(dur)}).then(r=>onProgress?.(r.data.percent)).catch(()=>{});
-                }
+                const cur=Number(playerRef.current?.getCurrentTime?.()||0);
+                if(cur - lastSent.current >= 5) sendProgress();
               },5000);
             } else {
               if(intervalRef.current){ clearInterval(intervalRef.current); intervalRef.current=null; }
               if(e.data===YTState.PAUSED || e.data===YTState.ENDED){
-                const cur=playerRef.current?.getCurrentTime?.()||0;
-                const dur=playerRef.current?.getDuration?.()||material.duration||600;
-                api.post("/api/progress/video",{ materialId: material.id, pos: Math.floor(cur), duration: Math.floor(dur)}).then(r=>onProgress?.(r.data.percent)).catch(()=>{});
+                sendProgress();
               }
             }
           }
@@ -84,11 +100,8 @@ function YouTubePlayer({material, onProgress}:{material:any; onProgress?:any}){
       const YTState=(window as any).YT?.PlayerState;
       if(!player || !YTState || state!==YTState.PLAYING) return;
       const cur=Number(player.getCurrentTime?.()||0);
-      const dur=Number(player.getDuration?.()||material.duration||600);
-      if(!Number.isFinite(cur) || !Number.isFinite(dur) || dur<1 || cur-lastSent.current<5) return;
-      lastSent.current=cur;
-      setSecs(Math.floor(cur));
-      api.post("/api/progress/video",{ materialId: material.id, pos: Math.floor(cur), duration: Math.floor(dur) }).then(r=>onProgress?.(r.data.percent)).catch(()=>{});
+      if(!Number.isFinite(cur) || cur-lastSent.current<5) return;
+      sendProgress();
     },5000);
     return ()=>clearInterval(poll);
   },[material.id, material.duration, onProgress]);
@@ -124,14 +137,19 @@ function DrivePlayer({material, onProgress}:{material:any; onProgress?:any}){
 function UploadPlayer({material, onProgress}:{material:any; onProgress?:any}){
   const ref=useRef<HTMLVideoElement>(null);
   const lastSent=useRef(0);
+  const saving=useRef(false);
   const sendProgress = () => {
     const video = ref.current;
     if (!video) return;
     const duration = Number(video.duration || material.duration || 0);
     const position = Math.min(Number(video.currentTime || 0), duration || Number(video.currentTime || 0));
     if (!Number.isFinite(duration) || duration < 1 || !Number.isFinite(position)) return;
-    lastSent.current = position;
-    api.post("/api/progress/video", { materialId: material.id, pos: Math.floor(position), duration: Math.floor(duration) }).then((response) => onProgress?.(response.data.percent)).catch(()=>{});
+    if (saving.current) return;
+    saving.current = true;
+    api.post("/api/progress/video", { materialId: material.id, pos: Math.floor(position), duration: Math.floor(duration) })
+      .then((response) => { lastSent.current = position; onProgress?.(response.data.percent); })
+      .catch(()=>{})
+      .finally(() => { saving.current = false; });
   };
   useEffect(()=>{
     // resume lastPosition
@@ -145,7 +163,8 @@ function UploadPlayer({material, onProgress}:{material:any; onProgress?:any}){
   useEffect(()=>{
     const flush=()=>sendProgress();
     window.addEventListener("pagehide", flush);
-    return ()=>window.removeEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", flush);
+    return ()=>{ window.removeEventListener("pagehide", flush); document.removeEventListener("visibilitychange", flush); };
   },[material.id]);
   return (
     <div className="space-y-2">

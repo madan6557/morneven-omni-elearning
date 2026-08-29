@@ -10,6 +10,18 @@ const finiteScore = (value: unknown) => { const number = Number(value); return N
 const safeVideo = (item: any) => ({ ...item, percent: finitePercent(item.percent) });
 const safeSlide = (item: any) => ({ ...item, percent: finitePercent(item.percent) });
 const safeAttempt = (item: any) => ({ ...item, score: finiteScore(item.score) });
+// Progress is read-modify-write (especially viewedPages), so serialize concurrent
+// updates from multiple tabs/devices and retry transient serialization conflicts.
+const withProgressTransaction = async <T>(work: (tx: any) => Promise<T>): Promise<T> => {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await (prisma.$transaction(work, { isolationLevel: "Serializable" } as any) as Promise<T>);
+    } catch (error: any) {
+      if (error?.code !== "P2034" || attempt === 2) throw error;
+    }
+  }
+  throw new Error("Progress transaction failed");
+};
 // Progress belajar hanya boleh dibuat oleh akun mahasiswa pemilik progress.
 r.use("/video", requireAuth as any, requireRole("MAHASISWA") as any);
 r.use("/slide", requireAuth as any, requireRole("MAHASISWA") as any);
@@ -21,20 +33,22 @@ r.post("/video", requireAuth as any, async (req:any,res)=>{
   const { materialId, pos, duration } = parsed.data;
   const mat = await prisma.material.findUnique({ where:{id:materialId}, include: { module: { select: { courseId: true } } } });
   if(!mat) return res.status(404).json({message:"material not found"});
-  if (await denyIfNoCourseAccess(req.user, mat.module.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
+  if (!mat.module || await denyIfNoCourseAccess(req.user, mat.module.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   if (getContentAvailability(mat) !== "AVAILABLE") return unavailableContent(res, mat, "MATERIAL");
   // Prefer the catalogued duration. Legacy URL materials may not have one yet,
   // so use the validated player duration until an instructor saves metadata.
   const effectiveDuration = mat.duration && mat.duration > 0 ? mat.duration : duration;
   const safePos = Math.min(pos, effectiveDuration);
-  const existing = await prisma.videoProgress.findUnique({ where:{ userId_materialId:{ userId:req.user.id, materialId }}});
-  const watchedSec = Math.max(existing?.watchedSec ?? 0, Math.floor(safePos));
-  const currentPercent = effectiveDuration ? Math.min(100, (safePos/effectiveDuration)*100) : 0;
-  const percent = Math.max(finitePercent(existing?.percent), finitePercent(currentPercent));
-  const up = await prisma.videoProgress.upsert({
-    where:{ userId_materialId:{ userId:req.user.id, materialId }},
-    update:{ watchedSec, lastPosition: Math.floor(safePos), percent },
-    create:{ userId:req.user.id, materialId, watchedSec: Math.floor(safePos), lastPosition: Math.floor(safePos), percent }
+  const up = await withProgressTransaction(async (tx) => {
+    const existing = await tx.videoProgress.findUnique({ where:{ userId_materialId:{ userId:req.user.id, materialId }}});
+    const watchedSec = Math.max(existing?.watchedSec ?? 0, Math.floor(safePos));
+    const currentPercent = effectiveDuration ? Math.min(100, (safePos/effectiveDuration)*100) : 0;
+    const percent = Math.max(finitePercent(existing?.percent), finitePercent(currentPercent));
+    return tx.videoProgress.upsert({
+      where:{ userId_materialId:{ userId:req.user.id, materialId }},
+      update:{ watchedSec, lastPosition: Math.floor(safePos), percent },
+      create:{ userId:req.user.id, materialId, watchedSec: Math.floor(safePos), lastPosition: Math.floor(safePos), percent }
+    });
   });
   res.json(up);
 });
@@ -46,22 +60,24 @@ r.post("/slide", requireAuth as any, async (req:any,res)=>{
   const { materialId, page } = parsed.data;
   const mat = await prisma.material.findUnique({ where:{id:materialId}, include: { module: { select: { courseId: true } } } });
   if(!mat) return res.status(404).json({message:"material not found"});
-  if (await denyIfNoCourseAccess(req.user, mat.module.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
+  if (!mat.module || await denyIfNoCourseAccess(req.user, mat.module.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   if (getContentAvailability(mat) !== "AVAILABLE") return unavailableContent(res, mat, "MATERIAL");
   const total = mat.totalPages || 10;
   if (page > total) return res.status(400).json({ message: `Halaman harus berada di antara 1 dan ${total}.` });
-  const existing = await prisma.slideProgress.findUnique({ where:{ userId_materialId:{ userId:req.user.id, materialId }}});
-  let viewed: number[] = [];
-  if(existing?.viewedPages) {
-    try{ const parsedViewed = typeof existing.viewedPages==="string" ? JSON.parse(existing.viewedPages) : existing.viewedPages; viewed = Array.isArray(parsedViewed) ? parsedViewed.map(Number).filter((item) => Number.isInteger(item) && item >= 1) : []; } catch{ viewed=[]; }
-  }
-  if(!viewed.includes(page)) viewed.push(page);
-  viewed = [...new Set(viewed.filter((item) => Number.isInteger(item) && item >= 1 && item <= total))].sort((a,b)=>a-b);
-  const percent = Math.min(100, (viewed.length/total)*100);
-  const up = await prisma.slideProgress.upsert({
-    where:{ userId_materialId:{ userId:req.user.id, materialId }},
-    update:{ viewedPages: JSON.stringify(viewed), currentPage: page, percent },
-    create:{ userId:req.user.id, materialId, viewedPages: JSON.stringify(viewed), currentPage: page, percent }
+  const up = await withProgressTransaction(async (tx) => {
+    const existing = await tx.slideProgress.findUnique({ where:{ userId_materialId:{ userId:req.user.id, materialId }}});
+    let viewed: number[] = [];
+    if(existing?.viewedPages) {
+      try{ const parsedViewed = typeof existing.viewedPages==="string" ? JSON.parse(existing.viewedPages) : existing.viewedPages; viewed = Array.isArray(parsedViewed) ? parsedViewed.map(Number).filter((item) => Number.isInteger(item) && item >= 1) : []; } catch{ viewed=[]; }
+    }
+    if(!viewed.includes(page)) viewed.push(page);
+    viewed = [...new Set(viewed.filter((item) => Number.isInteger(item) && item >= 1 && item <= total))].sort((a,b)=>a-b);
+    const percent = Math.min(100, (viewed.length/total)*100);
+    return tx.slideProgress.upsert({
+      where:{ userId_materialId:{ userId:req.user.id, materialId }},
+      update:{ viewedPages: JSON.stringify(viewed), currentPage: page, percent },
+      create:{ userId:req.user.id, materialId, viewedPages: JSON.stringify(viewed), currentPage: page, percent }
+    });
   });
   res.json(up);
 });
