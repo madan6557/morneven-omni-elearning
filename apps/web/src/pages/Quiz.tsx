@@ -11,8 +11,11 @@ const finiteNumber = (value: unknown) => {
 };
 const scoreText = (value: unknown) => {
   const score = finiteNumber(value);
-  return score === null ? "Belum dinilai" : `${Math.round(score)}%`;
+  return score === null ? "Belum dinilai" : `${Number(score.toFixed(2))}%`;
 };
+const visibleResultStatus = (status: unknown, mode: unknown) => status === "Menunggu publikasi hasil" && mode === "HIDDEN"
+  ? "Hasil disembunyikan oleh pengelola."
+  : String(status || "");
 const kindLabel = (kind: string) => kind === "PRETEST" ? "Pretest" : kind === "POSTTEST" ? "Posttest" : "Quiz";
 const formatRemaining = (seconds: number | null) => {
   if (seconds === null) return "";
@@ -93,7 +96,14 @@ export default function Quiz() {
       setActiveAttempt(null);
       setResult(response.data);
       const history = await api.get(`/api/quizzes/${id}/attempts`);
-      setAttempts(Array.isArray(history.data) ? history.data : []);
+      const refreshedAttempts = Array.isArray(history.data) ? history.data : [];
+      setAttempts(refreshedAttempts);
+      const submittedCount = refreshedAttempts.filter((attempt: any) => attempt.submittedAt).length;
+      setStartMessage(quiz.attemptLimit > 0 && submittedCount >= quiz.attemptLimit
+        ? `Jawaban tersimpan. Batas attempt ${quiz.attemptLimit}x telah tercapai.`
+        : quiz.resultReleaseMode === "HIDDEN"
+          ? "Jawaban tersimpan. Hasil disembunyikan oleh pengelola."
+          : "Jawaban tersimpan. Anda dapat memulai attempt berikutnya bila diperlukan.");
       showFeedback("Jawaban berhasil dikirim.");
     } catch (reason: any) {
       const message = reason?.response?.data?.message || "Jawaban gagal dikirim.";
@@ -117,7 +127,7 @@ export default function Quiz() {
       {quiz.resultReleaseMode !== "HIDDEN" && <p className="text-xs text-zinc-500">Publikasi nilai: {quiz.resultReleaseMode === "SCHEDULED" ? quiz.resultReleaseAt ? `terjadwal ${new Date(quiz.resultReleaseAt).toLocaleString()}` : "terjadwal" : "manual oleh dosen/admin"}.</p>}
       {!activeAttempt && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">{startMessage || "Quiz belum dapat dimulai saat ini."}</div>}
       {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
-      {result && <div className={`rounded-xl border p-4 ${result.resultStatus ? "border-blue-200 bg-blue-50 text-blue-800" : result.passed ? "border-green-200 bg-green-50 text-green-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}><p className="font-bold">{result.resultStatus || (result.passed ? "Lulus" : "Belum lulus")}</p><p className="text-sm">{result.resultStatus || `Skor: ${scoreText(result.score)} (${finiteNumber(result.rawScore) ?? 0}/${finiteNumber(result.maxScore) ?? 0} poin)`}</p></div>}
+      {result && <div className={`rounded-xl border p-4 ${result.resultStatus ? "border-blue-200 bg-blue-50 text-blue-800" : result.passed ? "border-green-200 bg-green-50 text-green-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}><p className="font-bold">{visibleResultStatus(result.resultStatus, quiz.resultReleaseMode) || (result.passed ? "Lulus" : "Belum lulus")}</p><p className="text-sm">{visibleResultStatus(result.resultStatus, quiz.resultReleaseMode) || `Skor: ${scoreText(result.score)} (${finiteNumber(result.rawScore) ?? 0}/${finiteNumber(result.maxScore) ?? 0} poin)`}</p></div>}
     </section>
     <div className="space-y-4">{(quiz.questions || []).map((question: any, index: number) => <section key={question.id} className="section-card space-y-3">
       <h2 className="font-medium">{index + 1}. {question.text}</h2>
@@ -125,6 +135,6 @@ export default function Quiz() {
       {question.type === "ESSAY" ? <label className="block space-y-2 text-sm font-medium">Jawaban essay<textarea className="field min-h-32" placeholder="Tulis jawaban essay..." value={String(answers[question.id] || "")} onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))} disabled={!canSubmit} /></label> : <div className="space-y-2">{(Array.isArray(question.options) ? question.options : []).map((option: string, optionIndex: number) => <label key={optionIndex} className={`flex cursor-pointer gap-3 rounded-xl border p-3 ${answers[question.id] === optionIndex ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700"}`}><input type="radio" name={question.id} checked={answers[question.id] === optionIndex} onChange={() => setAnswers((current) => ({ ...current, [question.id]: optionIndex }))} disabled={!canSubmit} /><span className="text-sm">{String.fromCharCode(65 + optionIndex)}. {option}</span></label>)}</div>}
     </section>)}</div>
     <button type="button" disabled={submitting || !canSubmit} onClick={submit} className="primary-button w-full justify-center">{submitting && <Spinner />}{quiz.attemptLimit === 0 ? "Quiz ditutup" : timeExpired ? "Waktu habis" : !activeAttempt ? "Quiz belum dapat dimulai" : !canSubmit ? "Batas attempt tercapai" : submitting ? "Mengirim..." : "Kirim jawaban"}</button>
-    {attempts.length > 0 && <section className="section-card space-y-3"><h2 className="font-semibold">Riwayat percobaan</h2>{attempts.map((attempt: any) => <div key={attempt.id} className="flex flex-wrap justify-between gap-2 border-b border-zinc-200 py-2 text-sm last:border-0 dark:border-zinc-700"><span>{new Date(attempt.submittedAt || attempt.startedAt).toLocaleString()}</span><span>{attempt.resultStatus || scoreText(attempt.score)}{attempt.passed === true ? " · Lulus" : ""}</span></div>)}</section>}
+    {attempts.length > 0 && <section className="section-card space-y-3"><h2 className="font-semibold">Riwayat percobaan</h2>{attempts.map((attempt: any) => <div key={attempt.id} className="flex flex-wrap justify-between gap-2 border-b border-zinc-200 py-2 text-sm last:border-0 dark:border-zinc-700"><span>{new Date(attempt.submittedAt || attempt.startedAt).toLocaleString()}</span><span>{visibleResultStatus(attempt.resultStatus, quiz.resultReleaseMode) || scoreText(attempt.score)}{attempt.passed === true ? " · Lulus" : ""}</span></div>)}</section>}
   </div>;
 }

@@ -7,6 +7,7 @@ const finiteScore = (value: unknown) => {
   const score = Number(value);
   return Number.isFinite(score) ? score : null;
 };
+const formatPercent = (value: number) => Number(value.toFixed(2)).toString();
 
 export default function StudentProgress() {
   const { courseId, studentId } = useParams();
@@ -42,7 +43,7 @@ function ExamSection({ modules, attempts }: any) {
 
 function QuizResult({ quiz, attempts }: any) {
   const scores = attempts.map((attempt: any) => finiteScore(attempt.score)).filter((score: number | null): score is number => score !== null);
-  return <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold">{quiz.title}</p><p className="text-xs text-zinc-500">{attempts.length} attempt · passing {quiz.passingScore}%</p></div>{attempts.length === 0 ? <span className="text-xs text-zinc-500">Belum dikerjakan</span> : <span className="text-sm font-bold">Terbaik: {scores.length ? `${Math.max(...scores)}%` : "Belum dinilai"}</span>}</div>{attempts.map((attempt: any) => { const score = finiteScore(attempt.score); return <div key={attempt.id} className="mt-3 rounded-lg bg-zinc-50 p-3 text-sm dark:bg-zinc-800/70"><div className="flex items-center justify-between"><span>{new Date(attempt.submittedAt || attempt.startedAt).toLocaleString()}</span><span className={attempt.passed ? "text-emerald-600" : "text-red-600"}>{score === null ? "Belum dinilai" : `${Math.round(score)}%`} {attempt.passed ? <CheckCircle2 className="inline" size={15} /> : <XCircle className="inline" size={15} />}</span></div><div className="mt-2 space-y-2 text-xs text-zinc-600 dark:text-zinc-300">{quiz.questions.map((question: any) => <QuestionResult key={question.id} attempt={attempt} question={question} />)}</div></div>; })}</div>;
+  return <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold">{quiz.title}</p><p className="text-xs text-zinc-500">{attempts.length} attempt · passing {quiz.passingScore}%</p></div>{attempts.length === 0 ? <span className="text-xs text-zinc-500">Belum dikerjakan</span> : <span className="text-sm font-bold">Terbaik: {scores.length ? `${formatPercent(Math.max(...scores))}%` : "Belum dinilai"}</span>}</div>{attempts.map((attempt: any) => { const score = finiteScore(attempt.score); return <div key={attempt.id} className="mt-3 rounded-lg bg-zinc-50 p-3 text-sm dark:bg-zinc-800/70"><div className="flex items-center justify-between"><span>{new Date(attempt.submittedAt || attempt.startedAt).toLocaleString()}</span><span className={attempt.passed ? "text-emerald-600" : "text-red-600"}>{score === null ? "Belum dinilai" : `${formatPercent(score)}%`} {attempt.passed ? <CheckCircle2 className="inline" size={15} /> : <XCircle className="inline" size={15} />}</span></div><div className="mt-2 space-y-2 text-xs text-zinc-600 dark:text-zinc-300">{quiz.questions.map((question: any) => <QuestionResult key={question.id} attempt={attempt} question={question} />)}</div></div>; })}</div>;
 }
 
 function LegacyQuestionResult({ attempt, question }: any) {
