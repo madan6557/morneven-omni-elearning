@@ -53,7 +53,7 @@ r.post("/slide", requireAuth as any, async (req:any,res)=>{
   const existing = await prisma.slideProgress.findUnique({ where:{ userId_materialId:{ userId:req.user.id, materialId }}});
   let viewed: number[] = [];
   if(existing?.viewedPages) {
-    try{ const parsedViewed = typeof existing.viewedPages==="string" ? JSON.parse(existing.viewedPages) : existing.viewedPages; viewed = Array.isArray(parsedViewed) ? parsedViewed : []; } catch{ viewed=[]; }
+    try{ const parsedViewed = typeof existing.viewedPages==="string" ? JSON.parse(existing.viewedPages) : existing.viewedPages; viewed = Array.isArray(parsedViewed) ? parsedViewed.map(Number).filter((item) => Number.isInteger(item) && item >= 1) : []; } catch{ viewed=[]; }
   }
   if(!viewed.includes(page)) viewed.push(page);
   viewed = [...new Set(viewed.filter((item) => Number.isInteger(item) && item >= 1 && item <= total))].sort((a,b)=>a-b);

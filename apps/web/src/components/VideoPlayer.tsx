@@ -75,6 +75,24 @@ function YouTubePlayer({material, onProgress}:{material:any; onProgress?:any}){
     return ()=>{ cancelled=true; if(intervalRef.current) clearInterval(intervalRef.current); try{ playerRef.current?.destroy?.(); }catch{} };
   },[material.id]);
 
+  // Poll independently from onStateChange. Some browsers/embedded players do
+  // not reliably emit every YouTube state event, while the player is still playing.
+  useEffect(()=>{
+    const poll=setInterval(()=>{
+      const player=playerRef.current;
+      const state=player?.getPlayerState?.();
+      const YTState=(window as any).YT?.PlayerState;
+      if(!player || !YTState || state!==YTState.PLAYING) return;
+      const cur=Number(player.getCurrentTime?.()||0);
+      const dur=Number(player.getDuration?.()||material.duration||600);
+      if(!Number.isFinite(cur) || !Number.isFinite(dur) || dur<1 || cur-lastSent.current<5) return;
+      lastSent.current=cur;
+      setSecs(Math.floor(cur));
+      api.post("/api/progress/video",{ materialId: material.id, pos: Math.floor(cur), duration: Math.floor(dur) }).then(r=>onProgress?.(r.data.percent)).catch(()=>{});
+    },5000);
+    return ()=>clearInterval(poll);
+  },[material.id, material.duration, onProgress]);
+
   return (
     <div className="space-y-2">
       <div className="aspect-video bg-black rounded-xl overflow-hidden">

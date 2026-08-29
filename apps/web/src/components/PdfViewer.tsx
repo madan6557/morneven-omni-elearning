@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
 
+const normalizePages = (value: unknown) => Array.isArray(value) ? value.map(Number).filter((page) => Number.isInteger(page) && page >= 1) : [];
+
 // ponytail: minimal slide viewer — PDF & PPT per-slide tracking via viewedPages
 export default function PdfViewer({ material, onProgress }: { material: any, onProgress?: (p:number)=>void }){
   const isPPT = material.type==="PPT";
@@ -18,9 +20,20 @@ export default function PdfViewer({ material, onProgress }: { material: any, onP
       if(s){
         try{
           const v = typeof s.viewedPages==="string" ? JSON.parse(s.viewedPages) : s.viewedPages;
-          setViewed(v); setPercent(s.percent); onProgress?.(s.percent);
+          setViewed(normalizePages(v)); setPercent(Number(s.percent) || 0); onProgress?.(Number(s.percent) || 0);
         }catch{}
       }
+    }).catch(()=>{});
+  },[material.id]);
+
+  // Halaman pertama adalah halaman yang langsung dibuka. Catat sekali saat
+  // viewer tampil agar PPT tetap memiliki progress meskipun preview Office
+  // gagal merender slide pertama.
+  useEffect(()=>{
+    api.post("/api/progress/slide",{ materialId: material.id, page: 1 }).then(r=>{
+      const v = typeof r.data.viewedPages==="string" ? JSON.parse(r.data.viewedPages) : r.data.viewedPages;
+      const nextPercent = Number(r.data.percent) || 0;
+      setViewed(normalizePages(v)); setPercent(nextPercent); onProgress?.(nextPercent);
     }).catch(()=>{});
   },[material.id]);
 
@@ -29,7 +42,8 @@ export default function PdfViewer({ material, onProgress }: { material: any, onP
     setPage(np);
     api.post("/api/progress/slide",{ materialId: material.id, page: np }).then(r=>{
       const v = typeof r.data.viewedPages==="string" ? JSON.parse(r.data.viewedPages) : r.data.viewedPages;
-      setViewed(v); setPercent(r.data.percent); onProgress?.(r.data.percent);
+      const nextPercent = Number(r.data.percent) || 0;
+      setViewed(normalizePages(v)); setPercent(nextPercent); onProgress?.(nextPercent);
     }).catch(()=>{});
   };
 
