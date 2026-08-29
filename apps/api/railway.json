@@ -2,10 +2,10 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "RAILPACK",
-    "buildCommand": "pnpm install --frozen-lockfile && sed -i 's/provider = \"sqlite\"/provider = \"postgresql\"/' ../../packages/db/prisma/schema.prisma && npx prisma generate --schema=../../packages/db/prisma/schema.prisma && pnpm build"
+    "buildCommand": "pnpm install --frozen-lockfile && node ../../scripts/prepare-railway-prisma.mjs && npx prisma generate --schema=../../packages/db/prisma/schema.prisma && pnpm build"
   },
   "deploy": {
-    "preDeployCommand": "sed -i 's/provider = \"sqlite\"/provider = \"postgresql\"/' ../../packages/db/prisma/schema.prisma && npx prisma db push --schema=../../packages/db/prisma/schema.prisma --skip-generate",
+    "preDeployCommand": "node ../../scripts/prepare-railway-prisma.mjs && npx prisma db push --schema=../../packages/db/prisma/schema.prisma --skip-generate",
     "startCommand": "pnpm start",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 100
