@@ -13,6 +13,12 @@ const validateReorder = (req: any, res: any, next: any) => ["up", "down"].includ
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 const uploadRoot = path.resolve(uploadDir);
+const detectPdfPages = async (filePath: string) => {
+  const bytes = await fs.promises.readFile(filePath);
+  const text = bytes.toString("latin1");
+  const pages = (text.match(/\/Type\s*\/Page(?!s)\b/g) || []).length;
+  return pages > 0 ? pages : null;
+};
 const localUploadPath = (url?: string | null) => {
   if (!url?.startsWith("/uploads/")) return null;
   const filePath = path.resolve(uploadRoot, url.slice("/uploads/".length));
@@ -76,7 +82,8 @@ r.post("/upload", requireAuth as any, requireRole("ADMIN","DOSEN") as any, safeM
   const isOpen = parseBoolean(req.body.isOpen, true);
   const requireCompletionForDownload = parseBoolean(req.body.requireCompletionForDownload, false);
   const duration = req.body.duration === "" || req.body.duration === undefined ? 0 : Number(req.body.duration);
-  const totalPages = (type==="PDF" || type==="PPT") ? Number(req.body.totalPages || (type==="PPT"?10:12)) : undefined;
+  const detectedPages = type === "PDF" ? await detectPdfPages(path.join(uploadRoot, req.file.filename)) : null;
+  const totalPages = (type==="PDF" || type==="PPT") ? (detectedPages || Number(req.body.totalPages || (type==="PPT"?10:12))) : undefined;
   if (isOpen === null || requireCompletionForDownload === null || !Number.isFinite(duration) || duration < 0 || (totalPages !== undefined && (!Number.isInteger(totalPages) || totalPages <= 0))) { await removeMaterialFileIfUnused(sourceUrl); return res.status(400).json({ message: "Pengaturan materi, durasi, atau jumlah halaman tidak valid." }); }
   const last = await prisma.material.findFirst({ where: { moduleId }, orderBy: { order: "desc" } });
   const [assignmentContent, materialContent, quizContent] = await Promise.all([prisma.assignment.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } }), prisma.material.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } }), prisma.quiz.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } })]);
@@ -127,7 +134,8 @@ r.put("/:id/upload", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, s
     const isOpen = parseBoolean(req.body.isOpen, existing.isOpen);
     const requireCompletionForDownload = parseBoolean(req.body.requireCompletionForDownload, existing.requireCompletionForDownload);
     const duration = req.body.duration === "" ? null : req.body.duration === undefined ? existing.duration : Number(req.body.duration);
-    const totalPages = req.body.totalPages === "" ? null : req.body.totalPages === undefined ? existing.totalPages : Number(req.body.totalPages);
+    const detectedPages = type === "PDF" ? await detectPdfPages(path.join(uploadRoot, req.file.filename)) : null;
+    const totalPages = detectedPages || (req.body.totalPages === "" ? null : req.body.totalPages === undefined ? existing.totalPages : Number(req.body.totalPages));
     if (title.length < 2 || title.length > 200 || isOpen === null || requireCompletionForDownload === null || (duration !== null && (!Number.isFinite(duration) || duration < 0)) || (totalPages !== null && (!Number.isInteger(totalPages) || totalPages <= 0))) throw new Error("Data materi tidak valid.");
     const item = await prisma.material.update({ where: { id: existing.id }, data: { title, type, sourceType: "upload", sourceUrl, duration, totalPages, isOpen, availableFrom, availableUntil, requireCompletionForDownload } });
     await removeMaterialFileIfUnused(existing.sourceUrl);
