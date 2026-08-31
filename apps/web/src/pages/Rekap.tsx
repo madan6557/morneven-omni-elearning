@@ -7,6 +7,7 @@ const finiteScore = (value: unknown) => {
   const score = Number(value);
   return Number.isFinite(score) ? score : null;
 };
+const formatPercent = (value: number) => Number(value.toFixed(2)).toString();
 
 export default function Rekap() {
   const [courses, setCourses] = useState<any[]>([]);

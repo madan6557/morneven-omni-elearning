@@ -36,7 +36,7 @@ function ModuleDetail({ course, module, onBack, editingAssignment, setEditingAss
 }
 
 function FormButtons({ save, cancel, pending }: { save: () => void; cancel: () => void; pending: string | null }) {
-  return <div className="flex flex-wrap gap-2"><button type="button" onClick={save} disabled={pending !== null} className="primary-button">{pending ? <Spinner /> : <Save size={16} />} Simpan</button><button type="button" onClick={cancel} className="secondary-button">Batal</button></div>;
+  return <div className="flex flex-wrap justify-end gap-2"><button type="button" onClick={cancel} className="secondary-button">Batal</button><button type="button" onClick={save} disabled={pending !== null} className="primary-button">{pending ? <Spinner /> : <Save size={16} />} Simpan</button></div>;
 }
 
 function UserPicker({ role, selected, selectedUsers, setSelected }: { role: "DOSEN" | "MAHASISWA"; selected: string[]; selectedUsers: any[]; setSelected: (value: (current: string[]) => string[]) => void }) {
