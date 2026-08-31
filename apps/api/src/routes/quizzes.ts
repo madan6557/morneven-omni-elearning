@@ -12,6 +12,16 @@ import { notifyCourseStudents } from "../lib/notifications.js";
 import { contentPreview, getContentAvailability, unavailableContent } from "../lib/contentAvailability.js";
 
 const r = Router();
+const validateDateOrder = (req: any, res: any, next: any) => {
+  if (!["PUT", "PATCH"].includes(req.method)) return next();
+  const start = req.body?.availableFrom ? new Date(req.body.availableFrom) : null;
+  const end = req.body?.availableUntil ? new Date(req.body.availableUntil) : null;
+  const due = req.body?.deadline ? new Date(req.body.deadline) : null;
+  if ((start && Number.isNaN(start.getTime())) || (end && Number.isNaN(end.getTime())) || (due && Number.isNaN(due.getTime()))) return res.status(400).json({ message: "Jadwal quiz tidak valid." });
+  if ((start && end && end < start) || (start && due && due < start) || (end && due && due > end)) return res.status(400).json({ message: "Urutan tanggal quiz tidak valid. Pastikan jadwal mulai ≤ jadwal akses berakhir ≤ deadline." });
+  next();
+};
+ r.use("/", validateDateOrder);
 // AUTO is handled by the dedicated release endpoint so older PUT validation remains backward compatible.
 r.use((req: any, _res, next) => { if (req.method === "PUT" && req.body?.resultReleaseMode === "AUTO") { req.body.__autoResultRelease = true; delete req.body.resultReleaseMode; } next(); });
 const validateQuestionUpdate = (req: any, res: any, next: any) => { if (req.method === "PUT" && Array.isArray(req.body.questions)) { const error = validateQuestions(req.body.questions); if (error) return res.status(400).json({ message: error }); } next(); };

@@ -54,6 +54,13 @@ select:focus-visible {
   background: #100d18;
 }
 
+/* Keep native date/time controls readable when the dark theme is active. */
+.dark input[type="date"],
+.dark input[type="datetime-local"],
+.dark input[type="time"] {
+  color-scheme: dark;
+}
+
 @layer components {
   .app-shell {
     background:

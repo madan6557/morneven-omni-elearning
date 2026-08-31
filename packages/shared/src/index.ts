@@ -48,6 +48,7 @@ export const CreateQuizSchema = z.object({
 }).superRefine((quiz, ctx) => {
   if (quiz.availableFrom && quiz.deadline && new Date(quiz.deadline) < new Date(quiz.availableFrom)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["deadline"], message: "Deadline tidak boleh sebelum jadwal buka." });
   if (quiz.availableFrom && quiz.availableUntil && new Date(quiz.availableUntil) < new Date(quiz.availableFrom)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["availableUntil"], message: "Jadwal tutup tidak boleh sebelum jadwal buka." });
+  if (quiz.availableUntil && quiz.deadline && new Date(quiz.deadline) > new Date(quiz.availableUntil)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["deadline"], message: "Deadline tidak boleh setelah jadwal akses berakhir." });
   if (quiz.resultReleaseMode === "SCHEDULED" && !quiz.resultReleaseAt) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["resultReleaseAt"], message: "Jadwal publikasi wajib diisi untuk mode terjadwal." });
 });
 
@@ -88,6 +89,7 @@ export const CreateAssignmentSchema = z.object({
 }).superRefine((assignment, ctx) => {
   if (assignment.availableFrom && assignment.availableUntil && new Date(assignment.availableUntil) < new Date(assignment.availableFrom)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["availableUntil"], message: "Jadwal tutup tidak boleh sebelum jadwal buka." });
   if (assignment.availableFrom && assignment.deadline && new Date(assignment.deadline) < new Date(assignment.availableFrom)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["deadline"], message: "Deadline tidak boleh sebelum jadwal buka." });
+  if (assignment.availableUntil && assignment.deadline && new Date(assignment.deadline) > new Date(assignment.availableUntil)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["deadline"], message: "Deadline tidak boleh setelah jadwal akses berakhir." });
 });
 
 // pagination

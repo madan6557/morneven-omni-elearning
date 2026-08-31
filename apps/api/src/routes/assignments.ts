@@ -69,7 +69,7 @@ r.put("/:id", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, async (r
   const start = availableFrom ? new Date(availableFrom) : null;
   const end = availableUntil ? new Date(availableUntil) : null;
   const due = deadline ? new Date(deadline) : null;
-  if ((start && Number.isNaN(start.getTime())) || (end && Number.isNaN(end.getTime())) || (due && Number.isNaN(due.getTime())) || (start && end && end < start) || (start && due && due < start)) return res.status(400).json({ message: "Jadwal atau deadline tugas tidak valid." });
+  if ((start && Number.isNaN(start.getTime())) || (end && Number.isNaN(end.getTime())) || (due && Number.isNaN(due.getTime())) || (start && end && end < start) || (start && due && due < start) || (end && due && due > end)) return res.status(400).json({ message: "Urutan tanggal tugas tidak valid. Pastikan jadwal mulai ≤ jadwal akses berakhir ≤ deadline." });
   res.json(await prisma.assignment.update({ where: { id: req.params.id }, data: { moduleId, title, description: description || null, availableFrom: start, availableUntil: end, deadline: due, ...(typeof req.body.isOpen === "boolean" ? { isOpen: req.body.isOpen } : {}), ...(typeof req.body.archived === "boolean" ? { archived: req.body.archived } : {}) } }));
 });
 
