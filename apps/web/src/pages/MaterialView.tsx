@@ -68,7 +68,7 @@ export default function MaterialView(){
           </div>
         )}
         {(mat.type==="PDF" || mat.type==="PPT") && (
-          <div className="mt-4 flex gap-2">
+          <div className="mt-4 flex justify-end gap-2">
             <button disabled={downloading || !downloadReady} onClick={handleDownload} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-zinc-800 border dark:border-zinc-700 text-sm disabled:cursor-not-allowed disabled:opacity-50">{downloading ? <Spinner size={14} /> : "⬇"} {downloadReady ? (downloading ? "Mencatat..." : "Download & Catat Progress") : "Selesaikan materi terlebih dahulu"}</button>
           </div>
         )}
