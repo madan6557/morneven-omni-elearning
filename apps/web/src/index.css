@@ -100,7 +100,7 @@ select:focus-visible {
 
   /* Section-level primary actions sit at the end of the section header/content. */
   .section-card > .primary-button {
-    @apply ml-auto;
+    @apply ml-auto flex w-fit;
   }
 
   .secondary-button {
