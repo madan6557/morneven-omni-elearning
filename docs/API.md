@@ -19,7 +19,7 @@ Auth: cookie sesi `omni_session` HttpOnly atau `Authorization: Bearer <JWT>` (ke
 `Bearer` → `{id,nim,name,role}`
 
 ### POST /api/auth/register
-`{nim,name,password,role}` → 201
+`{nim,name,password,role}` → 201 hanya jika `ALLOW_PUBLIC_REGISTER=true`. Production menonaktifkan register publik; gunakan `POST /api/auth/users` oleh ADMIN atau SSO tervalidasi.
 
 ### POST /api/auth/users (ADMIN)
 `Bearer ADMIN` `{nim,name,password,role}` → 201
@@ -38,7 +38,7 @@ Menghapus cookie sesi browser. Register publik dinonaktifkan di production kecua
 `Bearer` → MAHASISWA hanya enrolled, DOSEN/ADMIN semua. Include `modules{materials,quizzes}`
 
 ### GET /api/courses/:id
-`Bearer` → `Course` dengan `modules order asc {materials order asc, quizzes {questions}}`
+`Bearer` → `Course` dengan `modules order asc`. Untuk MAHASISWA, item tertutup hanya mengirim preview aman (`id`, `title`, `type`, `moduleId`, status/jadwal); detail isi, attachment, soal, progress, dan jawaban benar tidak dikirim. ADMIN/DOSEN yang berwenang dapat melihat detail pengelolaan.
 
 ### POST /api/courses (ADMIN saja)
 `{title,description}` → 201
@@ -120,13 +120,13 @@ Browser menggunakan cookie `omni_session` HttpOnly; Bearer token tetap didukung 
 `Bearer`
 
 ### GET /api/quizzes/:id
-→ `{id,title,kind,passingScore,questions:[{id,text,options:[],correctIndex,points}]}` (options sudah JSON.parse)
+→ Staff menerima detail pengelolaan dan answer key. Mahasiswa hanya menerima soal/opsi saat konten tersedia; `correctIndex`, jawaban benar, attempt atau submission user lain tidak pernah dikirim.
 
 ### POST /api/quizzes (DOSEN/ADMIN)
 ```json
 {
   "title":"Pretest Modul 1", "kind":"PRETEST", "moduleId":"mod-1",
-  "questions":[{"text":"HTML?","options":["A","B","C","D"],"correctIndex":0,"points":10}]
+  "questions":[{"type":"MULTIPLE_CHOICE","text":"HTML?","options":["A","B"],"correctIndex":0,"points":10}]
 }
 ```
 
@@ -136,14 +136,14 @@ Browser menggunakan cookie `omni_session` HttpOnly; Bearer token tetap didukung 
 ### POST /api/quizzes/:id/submit
 ```json
 { "answers":[{"questionId":"q1","chosen":0}] }
-→ {id, score:100, passed:true, maxScore:30, rawScore:30}
+→ nilai finite atau `null`/status pending essay; nilai maksimum `0` menghasilkan skor `0`, tidak pernah `NaN`.
 ```
 
 ### GET /api/quizzes/:id/attempts
 `Bearer` (MAHASISWA hanya self, DOSEN semua)
 
 ### PATCH /api/quizzes/:id/result-release
-`ADMIN/DOSEN` mengatur `resultReleaseMode` (`AUTO`, `HIDDEN`, `MANUAL`, `SCHEDULED`), `resultReleaseAt`, dan `publish`. Mode AUTO langsung membuat hasil terlihat setelah submit. Mode HIDDEN tidak menampilkan hasil kepada mahasiswa.
+`ADMIN/DOSEN` mengatur `resultReleaseMode` (`AUTO`, `HIDDEN`, `MANUAL`, `SCHEDULED`), `resultReleaseAt`, dan `publish`. `AUTO` adalah default dan langsung membuat hasil terlihat setelah submit. `HIDDEN` hanya dapat dilihat staff dan bukan status menunggu publikasi bagi mahasiswa. `MANUAL` menunggu `publish:true`; `SCHEDULED` dirilis otomatis saat waktu server tercapai.
 
 ### PATCH /api/quizzes/:id/schedule
 `ADMIN/DOSEN` mengatur `isOpen`, `availableFrom`, `availableUntil`, `deadline`, dan `timerMode` (`INDEPENDENT` atau `SYNC_DEADLINE`).
@@ -173,7 +173,16 @@ Membuat dan mengunduh `application/zip`. ZIP logical backup berisi `manifest.jso
 Error standar: `BACKUP_FILE_REQUIRED`, `BACKUP_ZIP_REQUIRED`, `BACKUP_FORMAT_UNSUPPORTED`, atau `BACKUP_RESTORE_FAILED`. ZIP lama yang hanya berisi `database.sqlite` tetap didukung pada SQLite lokal; ZIP tersebut tidak dapat dipulihkan ke PostgreSQL.
 
 ### GET /api/health
-→ `{ok:true}`
+→ `{ok, checks:{api,database,storage}, time}`. Status `200` hanya jika API, database, dan storage semuanya sehat; jika salah satu gagal, status `503` dan komponen yang bermasalah dapat diidentifikasi dari `checks`.
+
+### Pengurutan konten
+Endpoint reorder mempertahankan urutan global pada konteks yang dipilih. Frontend menyediakan drag-and-drop melalui handle enam titik (2 kolom × 3 baris) di kiri tombol naik, dengan tombol naik/turun sebagai fallback.
+
+- `PATCH /api/courses/modules/:id/reorder` `{direction:"up"|"down"}` untuk modul.
+- `PATCH /api/courses/modules/:moduleId/content/reorder` `{itemType,itemId,direction}` untuk urutan gabungan materi/tugas/Quiz.
+- `PATCH /api/materials/:id/reorder`, `PATCH /api/assignments/:id/reorder`, dan `PATCH /api/quizzes/:id/reorder` `{direction}` untuk section per jenis atau bank soal.
+
+Semua operasi memerlukan role dan akses course yang sesuai serta divalidasi server.
 
 ---
 

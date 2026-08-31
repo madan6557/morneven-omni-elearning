@@ -13,7 +13,7 @@ Panduan operasional berdasarkan role tersedia di [USER_GUIDE.md](./USER_GUIDE.md
 - Akses course berasal dari role: ADMIN global, DOSEN dari assignment, dan MAHASISWA dari enrollment.
 - Progress video, slide, download, attempt, dan submission selalu terisolasi berdasarkan `userId` aktif.
 - `isOpen`, `availableFrom`, dan `availableUntil` mengatur ketersediaan konten. Sebelum tersedia, mahasiswa hanya menerima preview aman; detail, attachment, progress, download, submit, dan start attempt ditolak server.
-- `deadline` hanya membatasi pengumpulan tugas atau pengiriman jawaban quiz. `archive` menyembunyikan item dari mahasiswa tanpa menghapusnya.
+- `deadline` hanya membatasi pengumpulan tugas atau pengiriman jawaban quiz. `archive` menyembunyikan item dari mahasiswa tanpa menghapusnya. Item dapat diurutkan dengan drag-and-drop menggunakan handle enam titik (2 kolom × 3 baris) tepat di kiri tombol naik; tombol naik/turun tetap menjadi fallback.
 - UTS/UAS adalah modul khusus; `Quiz.kind` hanya `QUIZ`, `PRETEST`, dan `POSTTEST`. Hasil ujian mendukung AUTO (langsung), HIDDEN, MANUAL, dan SCHEDULED.
 - Nilai API harus finite atau `null`; nilai kosong ditampilkan sebagai **Belum dinilai**, bukan `NaN`.
 
@@ -27,10 +27,10 @@ Perubahan schema atau endpoint membutuhkan migration dan redeploy backend serta 
 |---------|--------|
 | **Materi** | Video YouTube / Drive embed + upload (multer, 500MB), PDF/PPT dengan jumlah halaman otomatis, dan tracking download. `Material.type: VIDEO\|PDF\|PPT`, `sourceType: youtube\|drive\|upload` |
 | **Tracking Progress** | **Download** via `GET /api/materials/:id/download` → `MaterialDownload`; **Slide PDF** `viewedPages JSON` + `percent` via `POST /api/progress/slide {page}` (PdfViewer throttle); **Video** `watchedSec/lastPosition/percent` via `POST /api/progress/video {pos,duration}` (`<video> timeupdate 5s`, YT est.) |
-| **Quiz** | Pretest/Posttest/Quiz per modul, PG 4 opsi, auto-nilai, `passingScore`, `attemptLimit`, `QuizAttempt` |
-| **Rekap Dosen** | `GET /api/progress/rekap/:courseId` → per NIM: `overall = avg(video%+slide%+download)`, `Export CSV` |
-| **Role** | `ADMIN` (kelola user, backup/restore ZIP), `DOSEN` (CRUD course/module/material/quiz, lihat rekap), `MAHASISWA` (enroll, baca materi, kerjakan quiz). Tombol `Rekap`/`Kelola`/`Backup` hidden untuk MAHASISWA |
-| **Auth** | NIM/password (bcrypt), JWT 7d `Authorization: Bearer`, `iron-session` style httpOnly via `next-auth`/`jsonwebtoken` |
+| **Quiz** | Pretest/Posttest/Quiz per modul reguler, pilihan ganda minimal 2 opsi atau essay, auto/manual grading, `passingScore`, `attemptLimit`, timer, publikasi hasil, dan `QuizAttempt` |
+| **Rekap dan laporan** | `GET /api/reports/courses/:courseId` → ringkasan, progress materi, attempt, submission, dan download; tersedia export XLSX multi-sheet serta CSV ringkas |
+| **Role** | `ADMIN` (semua course, user, backup/restore ZIP), `DOSEN` (course yang ditugaskan, konten, nilai, dan rekap), `MAHASISWA` (course yang di-enroll, materi, tugas, quiz). Menu administrasi disembunyikan untuk role yang tidak berwenang |
+| **Auth** | Login NIM/identifier + password (bcrypt), sesi cookie HttpOnly, Bearer JWT untuk integrasi, logout/revocation melalui `tokenVersion`, dan rate limit login |
 | **Integrasi SI Utama** | `externalId` nullable, SSO JWT `HS256`, `X-API-Key` untuk export, `docs/INTEGRATION.md` |
 
 ---
@@ -53,7 +53,7 @@ Perubahan schema atau endpoint membutuhkan migration dan redeploy backend serta 
  packages/shared   Zod DTOs (LoginSchema, VideoProgressSchema, etc.)
  packages/config   shared tsconfig/eslint
  vercel.json       root build pnpm --filter web build → apps/web/dist
- railway.json      build: pnpm install + sed sqlite→postgresql + prisma generate, deploy: migrate deploy + seed
+railway.json      Railpack build + Prisma generate, pre-deploy schema sync PostgreSQL, start API, dan health check
  docker-compose.yml Postgres 16 (lokal, opsional)
 ```
 
@@ -63,7 +63,7 @@ Perubahan schema atau endpoint membutuhkan migration dan redeploy backend serta 
 
 - **FE:** Vite 6, React 18, React Router 6, Tailwind 3, axios, @tanstack/react-query
 - **BE:** Express 4, TypeScript 5, Prisma 5, Zod, jsonwebtoken, bcryptjs, multer, cors, dotenv, tsx
-- **DB:** Course → Module → Material → Enrollment, MaterialDownload, VideoProgress (watchedSec,lastPosition,percent), SlideProgress (viewedPages String JSON), Quiz/Question/QuizAttempt
+- **DB:** Course → Module → Material/Assignment/Quiz, Enrollment, progress individual, download, submission, grading essay, notification, audit log, serta metadata publikasi hasil
 - **Auth:** `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/users` (ADMIN)
 - **Tracking:** `timeupdate` 5s (upload), YT `setInterval 5s getCurrentTime` est., Drive `visibility` est.
 - **Infra:** pnpm 10, turbo 2, Node 20, Vercel (FE), Railway (BE + Postgres + Volume), SQLite fallback dev
@@ -178,19 +178,23 @@ Base `http://localhost:4000` / `https://...up.railway.app`
 
 **Auth** `POST /api/auth/login` `{nim,password}` → `{token,user:{id,nim,name,role}}` ; `GET /api/auth/me` Bearer ; `POST /api/auth/register` / `POST /api/auth/users` (ADMIN) ; `GET /api/auth/users` (ADMIN/DOSEN)
 
-**Courses** `GET /api/courses` (MAHASISWA hanya enrolled), `GET /api/courses/:id` (include modules.materials/quizzes), `POST /api/courses` (DOSEN/ADMIN), `POST /api/courses/:courseId/modules`, `POST /api/courses/:id/enroll`
+**Courses** `GET /api/courses` (MAHASISWA hanya enrolled), `GET /api/courses/:id` (include modules.materials/quizzes), `POST /api/courses` (ADMIN), `POST /api/courses/:courseId/modules`, `POST /api/courses/:id/enroll`
 
 **Materials** `POST /api/materials` `CreateMaterialSchema`, `POST /api/materials/upload` `multipart file`, `GET /api/materials/:id`, `GET /api/materials/:id/download` (log `MaterialDownload` lalu redirect/stream), `GET /api/materials/:id/downloads` (DOSEN)
 
-**Progress** `POST /api/progress/video` `{materialId,pos,duration}` → `VideoProgress` upsert `watchedSec=max`, `percent`, `POST /api/progress/slide` `{materialId,page}` → `viewedPages JSON`, `GET /api/progress/course/:courseId` (self), `GET /api/progress/rekap/:courseId` (DOSEN, `overall` avg), `GET /api/progress/integration/export/:courseId` `X-API-Key`
+**Progress** `POST /api/progress/video` `{materialId,pos,duration}` → `VideoProgress` upsert `watchedSec=max`, `percent`, `POST /api/progress/slide` `{materialId,page}` → `viewedPages JSON`, `GET /api/progress/course/:courseId` (self), `GET /api/progress/rekap/:courseId` (DOSEN/ADMIN, data per mahasiswa), `GET /api/progress/integration/export/:courseId` `X-API-Key`
 
-**Quizzes** `GET /api/quizzes?moduleId=&courseId=`, `GET /api/quizzes/:id`, `POST /api/quizzes` `CreateQuizSchema`, `POST /api/quizzes/:id/start`, `POST /api/quizzes/:id/submit` `{answers:[{questionId,chosen}]}` → `{score,passed,maxScore}`, `GET /api/quizzes/:id/attempts`
+**Quizzes** `GET /api/quizzes?moduleId=&courseId=`, `GET /api/quizzes/:id`, `POST /api/quizzes` `CreateQuizSchema`, `POST /api/quizzes/:id/start`, `POST /api/quizzes/:id/submit` `{answers:[{questionId,chosen|answerText}]}` → score finite atau status essay pending, `GET /api/quizzes/:id/attempts`, `PATCH /api/quizzes/:id/result-release`
 
 **Integration** `POST /api/integration/auth/sso` `{token: JWT SI Utama}` → `{token: new, user}`
 
 **Backup/restore** `GET /api/backup/download` (ADMIN) mengunduh ZIP logical backup database + `uploads/`; `POST /api/backup/restore` (ADMIN) memulihkan ZIP resmi secara transaksional. Format baru kompatibel PostgreSQL Railway dan SQLite lokal.
 
-**Health** `GET /api/health` → `{ok:true}`
+**Reports** `GET /api/reports/courses/:courseId`, `/export.xlsx`, dan `/export.csv` (ADMIN/DOSEN, filter `moduleId`, `kind`, `from`, `to`). XLSX memiliki sheet ringkasan, progress materi, attempt Quiz, submission tugas, dan download.
+
+**Notifications/Calendar** `GET /api/notifications`, PATCH read/read-all, dan `GET /api/calendar` hanya mengembalikan data user/course yang berwenang.
+
+**Health** `GET /api/health` → `{ok, checks:{api,database,storage}, time}`; status 503 jika database atau storage gagal.
 
 Semua `requireAuth`, `requireRole`, `requireApiKey` di `apps/api/src/middleware/auth.ts`.
 
@@ -198,7 +202,7 @@ Semua `requireAuth`, `requireRole`, `requireApiKey` di `apps/api/src/middleware/
 
 ## 9. Frontend Routes
 
-`/login`, `/` (Dashboard `Halo, name` + cards), `/courses` (list), `/courses/:id` (modules → materials + quiz pre/post, `Rekap`/`Kelola` hidden untuk MAHASISWA), `/material/:id` (`VideoPlayer` YT/Drive/upload + `PdfViewer` iframe + PPT download), `/quiz/:id` (radio, `Kirim` → score), `/rekap` (DOSEN, tabel `NIM|Nama|Overall|Download|Video|Slide|Quiz` + Export CSV), `/manage` (DOSEN, tambah modul/materi/quiz + upload), `/users` (ADMIN), `/backup` (ADMIN, backup dan restore ZIP)
+`/login`, `/` (Dashboard `Halo, name` + cards), `/courses` (list), `/courses/:id` (modules → materials + tugas + quiz, status preview aman untuk konten tertutup), `/material/:id` (tracking video/PDF/PPT), `/assignment/:id` (submission file/link), `/quiz/:id` (pilihan ganda/essay, timer, attempt, publikasi), `/rekap` (ADMIN/DOSEN, laporan progress + Export CSV/XLSX), `/manage` (ADMIN/DOSEN berwenang), `/users` (ADMIN), `/backup` (ADMIN, backup dan restore ZIP), `/help` (artikel sesuai role)
 
 ---
 

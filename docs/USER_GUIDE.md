@@ -103,7 +103,7 @@ Mahasiswa yang belum mulai setelah jadwal tutup tidak dapat memulai. Timer dival
 
 ### Hasil
 
-Hasil memiliki empat mode. `AUTO` (default) langsung menampilkan hasil setelah mahasiswa selesai mengirim jawaban. `HIDDEN` menyimpan hasil hanya untuk dosen/admin sampai dirilis. `MANUAL` menunggu tombol publikasi. `SCHEDULED` mengikuti waktu rilis. Jawaban benar tidak dibocorkan sebelum diizinkan.
+Hasil memiliki empat mode. `AUTO` (default) langsung menampilkan hasil setelah mahasiswa selesai mengirim jawaban. `HIDDEN` hanya dapat dilihat dosen/admin dan tidak menampilkan status seolah-olah menunggu publikasi kepada mahasiswa. `MANUAL` menunggu tombol publikasi. `SCHEDULED` mengikuti waktu rilis. Jawaban benar tidak dibocorkan sebelum diizinkan.
 
 Untuk publikasi manual, dosen/admin membuka `Kelola → pilih mata kuliah → pilih modul → Quiz dan soal/Bank soal`, lalu memilih `Edit` pada quiz. Pada field `Publikasi nilai`, pilih `Manual` dan tekan `Simpan`. Setelah kembali ke daftar, tekan tombol `Publikasikan hasil` pada quiz yang berstatus Manual dan konfirmasi bila diminta. Untuk UTS/UAS, tombol yang sama tersedia pada daftar Bank soal modul ujian. Tombol publikasi hanya tersedia untuk ADMIN atau DOSEN yang berwenang; mahasiswa baru dapat melihat nilai setelah publikasi.
 
@@ -115,7 +115,7 @@ Untuk publikasi manual, dosen/admin membuka `Kelola → pilih mata kuliah → pi
 2. Kelola dosen pengampu dan mahasiswa pada pengaturan.
 3. Buat modul reguler, UTS, atau UAS.
 4. Pilih card modul untuk mengelola isinya.
-5. Gunakan tombol naik/turun untuk mengubah urutan tanpa membuat ulang item.
+5. Untuk mengurutkan, seret handle enam titik (2 kolom × 3 baris) yang berada tepat di kiri tombol naik ke posisi tujuan. Jika drag-and-drop tidak tersedia, gunakan tombol naik/turun sebagai fallback; perubahan disimpan di server tanpa membuat ulang item.
 
 Modul UTS/UAS hanya boleh memiliki bank soal dan konfigurasi ujian. Materi/tugas dibuat pada modul reguler.
 
@@ -125,7 +125,7 @@ Picker dosen/mahasiswa menggunakan pencarian server-side berdasarkan nama atau N
 
 ### Materi, tugas, dan Quiz
 
-Gunakan **Tambah**, **Edit**, **Arsipkan/Pulihkan**, dan tombol reorder pada detail modul. Form hanya dibuka saat diperlukan. Jadwal buka kosong berarti langsung tersedia; deadline kosong berarti terus terbuka.
+Gunakan **Tambah**, **Edit**, **Arsipkan/Pulihkan**, dan tombol reorder pada detail modul. Pada setiap section yang mendukung drag-and-drop, handle enam titik berada tepat di kiri tombol naik. Pengurutan modul, urutan konten gabungan, dan urutan per jenis (Tugas/Materi/Quiz) dikelola pada konteks yang berbeda. Form hanya dibuka saat diperlukan. Jadwal buka kosong berarti langsung tersedia; deadline kosong berarti terus terbuka.
 
 ### Konfigurasi evaluasi
 
@@ -135,9 +135,9 @@ Pilihan ganda membutuhkan minimal dua opsi dan jawaban benar. Essay tidak membut
 
 ### Import Excel
 
-Download template dari halaman pengelolaan Quiz/ujian. Isi satu baris untuk setiap soal. Kolom yang digunakan:
+Download template dari halaman pengelolaan Quiz/ujian. Isi satu baris untuk setiap soal. Template Quiz reguler memiliki kolom `kind` (`QUIZ`, `PRETEST`, atau `POSTTEST`); template UTS/UAS tidak memakai `kind` karena jenisnya berasal dari modul. Kolom yang digunakan:
 
-`title`, `module`, `passingScore`, `timeLimit`, `timerMode`, `attemptLimit`, `showAnswers`, `randomizeQuestions`, `randomizeOptions`, `questionCount`, `questionType`, `question`, `options`, `correctIndex`, `points`, `imageUrl`
+`title`, `module`, `kind` (Quiz reguler), `passingScore`, `timeLimit`, `timerMode`, `attemptLimit`, `showAnswers`, `randomizeQuestions`, `randomizeOptions`, `questionCount`, `resultReleaseMode`, `resultReleaseAt`, `availableFrom`, `availableUntil`, `deadline`, `questionType`, `question`, `options`, `correctIndex`, `points`, `imageUrl`
 
 Gunakan `||` sebagai pemisah opsi, misalnya `A||B||C`. Essay mengosongkan options dan correctIndex. Pada modul UTS/UAS, modul aktif menentukan konteks ujian. Import transaksional; satu baris invalid membatalkan seluruh import dan mengembalikan nomor baris.
 

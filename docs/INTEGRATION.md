@@ -122,7 +122,7 @@ Header: X-API-Key: <API_KEY>
 ```
 GET /api/progress/rekap/:courseId  (butuh JWT DOSEN/ADMIN, atau buat versi API_KEY)
 → { course, rekap: [{user:{nim,name}, overall, videos, slides, downloads, attempts}] }
-overall = avg(video% + slide% + download 0/100)
+`overall` dihitung per mahasiswa dari aktivitas aktif: materi selesai, Quiz yang sudah disubmit, dan tugas yang sudah dikumpulkan. Gunakan endpoint Reports untuk laporan lengkap per materi, attempt, submission, dan download.
 ```
 
 **SI Utama contoh tarik:**
