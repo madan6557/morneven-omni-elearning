@@ -21,7 +21,7 @@ export default function CourseDetail() {
   const sMap = new Map((progress?.slides || []).map((x: any) => [x.materialId, x.percent]));
   const dlSet = new Set((progress?.downloads || []).map((x: any) => x.materialId));
   const quizDone = new Set((progress?.attempts || []).map((x: any) => x.quizId));
-  const totalItems = (c.assignments?.filter((item: any) => !item.archived).length || 0) + (c.modules?.reduce((sum: number, module: any) => sum + (module.materials?.filter((item: any) => !item.archived).length || 0) + (module.quizzes?.filter((item: any) => !item.archived).length || 0), 0) || 0);
+  const totalItems = c.modules?.reduce((sum: number, module: any) => sum + (module.assignments?.filter((item: any) => !item.archived).length || 0) + (module.materials?.filter((item: any) => !item.archived).length || 0) + (module.quizzes?.filter((item: any) => !item.archived).length || 0), 0) || 0;
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -38,15 +38,14 @@ export default function CourseDetail() {
       </section>
 
       <div className="space-y-5">
-        {c.assignments?.filter((item: any) => !item.archived).length > 0 && <section className="section-card overflow-hidden p-0"><div className="border-b border-zinc-100 bg-zinc-50/70 px-5 py-4 dark:border-zinc-800 dark:bg-zinc-800/50"><h2 className="font-semibold">Tugas</h2></div><div className="divide-y divide-zinc-100 dark:divide-zinc-800">{c.assignments.filter((item: any) => !item.archived).map((item: any) => <Link to={`/assignment/${item.id}`} key={item.id} className="block px-5 py-4 transition hover:bg-violet-50/50 sm:px-6"><p className="text-sm font-semibold">{item.title}</p>{item.description && <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{item.description}</p>}<p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300">{item.deadline ? `Deadline: ${new Date(item.deadline).toLocaleString()}` : "Tanpa deadline"}</p></Link>)}</div></section>}
         {c.modules?.map((m: any, moduleIndex: number) => (
-          <section key={m.id} className="section-card overflow-hidden p-0">
-            <div className="flex flex-col gap-3 border-b border-zinc-100 bg-zinc-50/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-zinc-800 dark:bg-zinc-800/50">
+          <details key={m.id} open className="group section-card overflow-hidden p-0">
+            <summary className="list-none cursor-pointer [&::-webkit-details-marker]:hidden"><div className="flex flex-col gap-3 border-b border-zinc-100 bg-zinc-50/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-zinc-800 dark:bg-zinc-800/50">
               <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-100 text-xs font-bold text-violet-700 dark:bg-violet-950/60 dark:text-violet-200">{String(moduleIndex + 1).padStart(2, "0")}</span><div><p className="text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-400">{m.type === "UTS" || m.type === "UAS" ? `Ujian ${m.type}` : "Module"}</p><h2 className="mt-0.5 font-semibold">{m.title}</h2></div></div>
-              <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{m.materials.length} materi · {m.quizzes.length} quiz</span>
-            </div>
+              <div className="flex items-center justify-between gap-3 sm:justify-end"><span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{m.materials.length} materi · {m.quizzes.length} quiz</span><span aria-hidden="true" className="text-lg leading-none text-zinc-400 transition-transform group-open:rotate-180">⌄</span></div>
+            </div></summary>
             <ModuleContent module={m} vMap={vMap} sMap={sMap} dlSet={dlSet} quizDone={quizDone} />
-          </section>
+          </details>
         ))}
       </div>
 
