@@ -1,11 +1,15 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
+import multer from "multer";
+import * as XLSX from "xlsx";
 import { prisma } from "../lib/prisma.js";
 import { signToken } from "../lib/jwt.js";
 import { ChangePasswordSchema, LoginSchema, RegisterSchema, UpdateUserSchema } from "@repo/shared";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { audit } from "../lib/audit.js";
 const r = Router();
+const userImport = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
+const safeUserImport = (req: any, res: any, next: any) => userImport.single("file")(req, res, (error: any) => error ? res.status(error.code === "LIMIT_FILE_SIZE" ? 413 : 400).json({ message: error.code === "LIMIT_FILE_SIZE" ? "Ukuran template maksimal 2 MB." : "File template tidak valid." }) : next());
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 const clientKey = (req: any) => String(req.ip || req.headers["x-forwarded-for"] || "unknown");
 const cookieSuffix = process.env.NODE_ENV === "production" ? "SameSite=None; Secure" : "SameSite=Lax";
@@ -48,6 +52,60 @@ r.post("/users", requireAuth as any, requireRole("ADMIN") as any, async (req, re
   const user = await prisma.user.create({ data: { nim, name, password: hash, role } });
   void audit((req as any).user?.id, "CREATE", "User", user.id, { role });
   res.status(201).json(user);
+});
+
+r.get("/users/template", requireAuth as any, requireRole("ADMIN") as any, (_req, res) => {
+  const sheet = XLSX.utils.aoa_to_sheet([
+    ["nim", "name", "password", "role"],
+    ["20250001", "Contoh Mahasiswa", "GantiPassword123", "MAHASISWA"],
+    ["19900101", "Contoh Dosen", "GantiPassword123", "DOSEN"],
+  ]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "Users");
+  const output = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", "attachment; filename=template-user-omni.xlsx");
+  res.send(output);
+});
+
+r.post("/users/import", requireAuth as any, requireRole("ADMIN") as any, safeUserImport, async (req: any, res) => {
+  if (!req.file) return res.status(400).json({ message: "File template wajib dipilih." });
+  let rows: any[];
+  try {
+    const workbook = XLSX.read(req.file.buffer, { type: "buffer", cellDates: false });
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    if (!firstSheet) throw new Error("Sheet Users tidak ditemukan.");
+    rows = XLSX.utils.sheet_to_json(firstSheet, { defval: "", raw: false });
+  } catch {
+    return res.status(400).json({ message: "Template Excel tidak dapat dibaca." });
+  }
+  if (!rows.length) return res.status(400).json({ message: "Template tidak memiliki data user." });
+  if (rows.length > 1000) return res.status(400).json({ message: "Maksimal 1.000 user per import." });
+  const users: Array<{ nim: string; name: string; password: string; role: "ADMIN" | "DOSEN" | "MAHASISWA" }> = [];
+  const errors: string[] = [];
+  const seen = new Set<string>();
+  rows.forEach((row, index) => {
+    const line = index + 2;
+    const value = (key: string) => String(row[key] ?? "").trim();
+    const payload = { nim: value("nim"), name: value("name"), password: value("password"), role: value("role").toUpperCase() || "MAHASISWA" };
+    const parsed = RegisterSchema.safeParse(payload);
+    if (!parsed.success) { errors.push(`Baris ${line}: ${parsed.error.issues.map((issue) => issue.message).join(", ")}`); return; }
+    if (seen.has(parsed.data.nim)) { errors.push(`Baris ${line}: NIM/identifier duplikat di dalam file.`); return; }
+    seen.add(parsed.data.nim);
+    users.push(parsed.data as typeof users[number]);
+  });
+  if (errors.length) return res.status(400).json({ message: "Import dibatalkan. Perbaiki baris berikut.", errors });
+  const existing = await prisma.user.findMany({ where: { nim: { in: users.map((user) => user.nim) } }, select: { nim: true } });
+  if (existing.length) return res.status(409).json({ message: "Import dibatalkan karena identifier sudah terdaftar.", errors: existing.map((user) => `NIM/identifier ${user.nim} sudah terdaftar.`) });
+  try {
+    const hashedUsers = await Promise.all(users.map(async (user) => ({ ...user, password: await bcrypt.hash(user.password, 10) })));
+    await prisma.$transaction(hashedUsers.map((user) => prisma.user.create({ data: { nim: user.nim, name: user.name, password: user.password, role: user.role } })));
+  } catch (error: any) {
+    if (error?.code === "P2002") return res.status(409).json({ message: "Import dibatalkan karena terdapat identifier yang sudah terdaftar." });
+    throw error;
+  }
+  void audit(req.user.id, "IMPORT", "User", undefined, { count: users.length });
+  res.status(201).json({ message: `${users.length} user berhasil diimport.`, count: users.length });
 });
 
 r.post("/logout", requireAuth as any, (_req, res) => { clearSessionCookie(res); res.json({ ok: true }); });
