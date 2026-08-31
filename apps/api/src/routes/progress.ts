@@ -35,9 +35,9 @@ r.post("/video", requireAuth as any, async (req:any,res)=>{
   if(!mat) return res.status(404).json({message:"material not found"});
   if (!mat.module || await denyIfNoCourseAccess(req.user, mat.module.courseId)) return res.status(403).json({ message: "Anda tidak memiliki akses ke mata kuliah ini." });
   if (getContentAvailability(mat) !== "AVAILABLE") return unavailableContent(res, mat, "MATERIAL");
-  // Prefer the catalogued duration. Legacy URL materials may not have one yet,
-  // so use the validated player duration until an instructor saves metadata.
+  // Prefer catalogued metadata; otherwise persist the real duration reported by the player.
   const effectiveDuration = mat.duration && mat.duration > 0 ? mat.duration : duration;
+  if (!mat.duration && effectiveDuration >= 1) await prisma.material.update({ where: { id: mat.id }, data: { duration: Math.ceil(effectiveDuration) } });
   const safePos = Math.min(pos, effectiveDuration);
   const up = await withProgressTransaction(async (tx) => {
     const existing = await tx.videoProgress.findUnique({ where:{ userId_materialId:{ userId:req.user.id, materialId }}});

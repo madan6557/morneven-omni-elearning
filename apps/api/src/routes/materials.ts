@@ -8,6 +8,8 @@ import { CreateMaterialSchema } from "@repo/shared";
 import { denyIfNoCourseAccess } from "../lib/courseAccess.js";
 import { notifyCourseStudents } from "../lib/notifications.js";
 import { getContentAvailability, unavailableContent } from "../lib/contentAvailability.js";
+// @ts-ignore unzipper has no bundled types.
+import unzipper from "unzipper";
 const r = Router();
 const validateReorder = (req: any, res: any, next: any) => ["up", "down"].includes(req.body.direction) ? next() : res.status(400).json({ message: "direction harus bernilai up atau down." });
 const uploadDir = process.env.UPLOAD_DIR || "./uploads";
@@ -19,6 +21,16 @@ const detectPdfPages = async (filePath: string) => {
   const pages = (text.match(/\/Type\s*\/Page(?!s)\b/g) || []).length;
   return pages > 0 ? pages : null;
 };
+const detectPptPages = async (filePath: string) => {
+  try {
+    const archive = await unzipper.Open.file(filePath);
+    const slides = archive.files.filter((entry: any) => /^ppt\/slides\/slide\d+\.xml$/i.test(entry.path));
+    return slides.length > 0 ? slides.length : null;
+  } catch {
+    return null;
+  }
+};
+const detectPages = (filePath: string, type: string) => type === "PDF" ? detectPdfPages(filePath) : type === "PPT" ? detectPptPages(filePath) : Promise.resolve(null);
 const localUploadPath = (url?: string | null) => {
   if (!url?.startsWith("/uploads/")) return null;
   const filePath = path.resolve(uploadRoot, url.slice("/uploads/".length));
@@ -81,10 +93,8 @@ r.post("/upload", requireAuth as any, requireRole("ADMIN","DOSEN") as any, safeM
   const sourceUrl = `/uploads/${req.file.filename}`;
   const isOpen = parseBoolean(req.body.isOpen, true);
   const requireCompletionForDownload = parseBoolean(req.body.requireCompletionForDownload, false);
-  const duration = req.body.duration === "" || req.body.duration === undefined ? 0 : Number(req.body.duration);
-  const detectedPages = type === "PDF" ? await detectPdfPages(path.join(uploadRoot, req.file.filename)) : null;
-  const totalPages = (type==="PDF" || type==="PPT") ? (detectedPages || Number(req.body.totalPages || (type==="PPT"?10:12))) : undefined;
-  if (isOpen === null || requireCompletionForDownload === null || !Number.isFinite(duration) || duration < 0 || (totalPages !== undefined && (!Number.isInteger(totalPages) || totalPages <= 0))) { await removeMaterialFileIfUnused(sourceUrl); return res.status(400).json({ message: "Pengaturan materi, durasi, atau jumlah halaman tidak valid." }); }
+  const totalPages = type === "PDF" || type === "PPT" ? await detectPages(path.join(uploadRoot, req.file.filename), type) : undefined;
+  if (isOpen === null || requireCompletionForDownload === null) { await removeMaterialFileIfUnused(sourceUrl); return res.status(400).json({ message: "Pengaturan materi tidak valid." }); }
   const last = await prisma.material.findFirst({ where: { moduleId }, orderBy: { order: "desc" } });
   const [assignmentContent, materialContent, quizContent] = await Promise.all([prisma.assignment.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } }), prisma.material.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } }), prisma.quiz.findFirst({ where: { moduleId }, orderBy: { contentOrder: "desc" } })]);
   try {
@@ -92,7 +102,7 @@ r.post("/upload", requireAuth as any, requireRole("ADMIN","DOSEN") as any, safeM
     const availableUntil = req.body.availableUntil ? new Date(req.body.availableUntil) : null;
     if ((availableFrom && Number.isNaN(availableFrom.getTime())) || (availableUntil && Number.isNaN(availableUntil.getTime())) || (availableFrom && availableUntil && availableUntil < availableFrom)) throw new Error("Jadwal materi tidak valid.");
     if (String(title).trim().length < 2 || String(title).trim().length > 200) throw new Error("Judul materi harus 2 sampai 200 karakter.");
-    const m = await prisma.material.create({ data:{ moduleId, title: String(title).trim(), type, sourceType:"upload", sourceUrl, isOpen, requireCompletionForDownload, availableFrom, availableUntil, order: (last?.order ?? 0) + 1, contentOrder: Math.max(assignmentContent?.contentOrder ?? 0, materialContent?.contentOrder ?? 0, quizContent?.contentOrder ?? 0) + 1, totalPages, duration: type==="VIDEO" ? duration : undefined } });
+    const m = await prisma.material.create({ data:{ moduleId, title: String(title).trim(), type, sourceType:"upload", sourceUrl, isOpen, requireCompletionForDownload, availableFrom, availableUntil, order: (last?.order ?? 0) + 1, contentOrder: Math.max(assignmentContent?.contentOrder ?? 0, materialContent?.contentOrder ?? 0, quizContent?.contentOrder ?? 0) + 1, totalPages, duration: null } });
     void notifyCourseStudents(moduleAccess.courseId, "MATERIAL_CREATED", "Materi baru", `Materi ${m.title} tersedia.`, `material:${m.id}:created`, `/material/${m.id}`);
     res.status(201).json(m);
   } catch (error) {
@@ -133,11 +143,9 @@ r.put("/:id/upload", requireAuth as any, requireRole("ADMIN", "DOSEN") as any, s
     const title = req.body.title === undefined ? existing.title : String(req.body.title).trim();
     const isOpen = parseBoolean(req.body.isOpen, existing.isOpen);
     const requireCompletionForDownload = parseBoolean(req.body.requireCompletionForDownload, existing.requireCompletionForDownload);
-    const duration = req.body.duration === "" ? null : req.body.duration === undefined ? existing.duration : Number(req.body.duration);
-    const detectedPages = type === "PDF" ? await detectPdfPages(path.join(uploadRoot, req.file.filename)) : null;
-    const totalPages = detectedPages || (req.body.totalPages === "" ? null : req.body.totalPages === undefined ? existing.totalPages : Number(req.body.totalPages));
-    if (title.length < 2 || title.length > 200 || isOpen === null || requireCompletionForDownload === null || (duration !== null && (!Number.isFinite(duration) || duration < 0)) || (totalPages !== null && (!Number.isInteger(totalPages) || totalPages <= 0))) throw new Error("Data materi tidak valid.");
-    const item = await prisma.material.update({ where: { id: existing.id }, data: { title, type, sourceType: "upload", sourceUrl, duration, totalPages, isOpen, availableFrom, availableUntil, requireCompletionForDownload } });
+    const totalPages = type === "PDF" || type === "PPT" ? await detectPages(path.join(uploadRoot, req.file.filename), type) : null;
+    if (title.length < 2 || title.length > 200 || isOpen === null || requireCompletionForDownload === null) throw new Error("Data materi tidak valid.");
+    const item = await prisma.material.update({ where: { id: existing.id }, data: { title, type, sourceType: "upload", sourceUrl, duration: null, totalPages, isOpen, availableFrom, availableUntil, requireCompletionForDownload } });
     await removeMaterialFileIfUnused(existing.sourceUrl);
     res.json(item);
   } catch (error) {
@@ -154,7 +162,7 @@ r.put("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (re
   if (!targetModule) return res.status(400).json({ message: "Modul materi tidak ditemukan." });
   if (targetModule.courseId !== existing.module.courseId) return res.status(400).json({ message: "Materi tidak dapat dipindahkan ke mata kuliah lain." });
   if (targetModule?.type === "UTS" || targetModule?.type === "UAS") return res.status(400).json({ message: "Modul UTS/UAS hanya dapat berisi quiz dan bank soal." });
-  const { title, type, sourceType, sourceUrl, duration, totalPages, archived, isOpen, requireCompletionForDownload } = req.body;
+  const { title, type, sourceType, sourceUrl, archived, isOpen, requireCompletionForDownload } = req.body;
   const nextTitle = title === undefined ? existing.title : String(title).trim();
   const nextType = type === undefined ? existing.type : String(type).toUpperCase();
   const nextSourceType = sourceType === undefined ? existing.sourceType : String(sourceType).toLowerCase();
@@ -165,9 +173,8 @@ r.put("/:id", requireAuth as any, requireRole("ADMIN","DOSEN") as any, async (re
   const start = availableFrom ? new Date(availableFrom) : null;
   const end = availableUntil ? new Date(availableUntil) : null;
   if ((start && Number.isNaN(start.getTime())) || (end && Number.isNaN(end.getTime())) || (start && end && end < start)) return res.status(400).json({ message: "Jadwal materi tidak valid." });
-  const nextDuration = duration === undefined ? existing.duration : duration === "" || duration === null ? null : Number(duration);
-  const nextTotalPages = totalPages === undefined ? existing.totalPages : totalPages === "" || totalPages === null ? null : Number(totalPages);
-  if ((nextDuration !== null && (!Number.isFinite(nextDuration) || nextDuration < 0)) || (nextTotalPages !== null && (!Number.isInteger(nextTotalPages) || nextTotalPages <= 0))) return res.status(400).json({ message: "Durasi atau jumlah halaman tidak valid." });
+  const nextDuration = nextType === "VIDEO" ? existing.type === "VIDEO" ? existing.duration : null : null;
+  const nextTotalPages = nextType === "PDF" || nextType === "PPT" ? existing.type === nextType ? existing.totalPages : null : null;
   const m = await prisma.material.update({ where:{id:req.params.id}, data: { moduleId, title: nextTitle, type: nextType, sourceType: nextSourceType, sourceUrl: nextSourceUrl, availableFrom: start, availableUntil: end, duration: nextDuration, totalPages: nextTotalPages, ...(typeof archived === "boolean" ? { archived } : {}), ...(typeof isOpen === "boolean" ? { isOpen } : {}), ...(typeof requireCompletionForDownload === "boolean" ? { requireCompletionForDownload } : {}) } });
   if (req.body.sourceUrl && req.body.sourceUrl !== existing.sourceUrl) await removeMaterialFileIfUnused(existing.sourceUrl);
   res.json(m);

@@ -68,7 +68,7 @@ export default function PdfViewer({ material, onProgress }: { material: any, onP
       <div className="bg-white dark:bg-zinc-800 rounded-xl border dark:border-zinc-700 overflow-hidden" style={{height: 560}}>
         <iframe src={isPPT ? src : `${src}#page=${page}`} className="w-full h-full" title={material.title} />
       </div>
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">{isPPT ? "PPT — per-slide tracking aktif (totalPages dari dosen), preview via Office Online. Klik halaman untuk progress." : "PDF — klik halaman / Next untuk mencatat progress (viewedPages JSON)."}</p>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">{isPPT ? "PPT — per-slide tracking aktif, jumlah halaman diambil otomatis dari file jika tersedia. Klik halaman untuk progress." : "PDF — jumlah halaman diambil otomatis dari file; klik halaman / Next untuk mencatat progress (viewedPages JSON)."}</p>
     </div>
   )
 }

@@ -25,7 +25,7 @@ Perubahan schema atau endpoint membutuhkan migration dan redeploy backend serta 
 
 | Kategori | Detail |
 |---------|--------|
-| **Materi** | Video YouTube / Drive embed + upload (multer, 500MB), PDF (12 hal demo), PPT (download-tracking). `Material.type: VIDEO\|PDF\|PPT`, `sourceType: youtube\|drive\|upload` |
+| **Materi** | Video YouTube / Drive embed + upload (multer, 500MB), PDF/PPT dengan jumlah halaman otomatis, dan tracking download. `Material.type: VIDEO\|PDF\|PPT`, `sourceType: youtube\|drive\|upload` |
 | **Tracking Progress** | **Download** via `GET /api/materials/:id/download` → `MaterialDownload`; **Slide PDF** `viewedPages JSON` + `percent` via `POST /api/progress/slide {page}` (PdfViewer throttle); **Video** `watchedSec/lastPosition/percent` via `POST /api/progress/video {pos,duration}` (`<video> timeupdate 5s`, YT est.) |
 | **Quiz** | Pretest/Posttest/Quiz per modul, PG 4 opsi, auto-nilai, `passingScore`, `attemptLimit`, `QuizAttempt` |
 | **Rekap Dosen** | `GET /api/progress/rekap/:courseId` → per NIM: `overall = avg(video%+slide%+download)`, `Export CSV` |

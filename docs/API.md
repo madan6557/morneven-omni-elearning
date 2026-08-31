@@ -59,12 +59,12 @@ Konten materi, tugas, dan quiz mengikuti kontrak availability: `isOpen=false`, `
 
 ### POST /api/materials (DOSEN/ADMIN)
 ```json
-{ "moduleId":"mod-1", "title":"Video Intro", "type":"VIDEO", "sourceType":"youtube", "sourceUrl":"https://youtu.be/...", "duration":212, "order":1 }
+{ "moduleId":"mod-1", "title":"Video Intro", "type":"VIDEO", "sourceType":"youtube", "sourceUrl":"https://youtu.be/..." }
 → 201
 ```
 
 ### POST /api/materials/upload (DOSEN/ADMIN) `multipart/form-data`
-`file, moduleId, title, type (VIDEO|PDF|PPT), duration?, totalPages?` → `sourceType:upload, sourceUrl:/uploads/...`
+`file, moduleId, title, type (VIDEO|PDF|PPT)` → `sourceType:upload, sourceUrl:/uploads/...`. Jumlah halaman PDF/PPT dihitung otomatis dari file; durasi video diambil otomatis dari metadata player dan tidak diinput manual.
 
 ### GET /api/materials/:id
 `Bearer`

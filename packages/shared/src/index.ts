@@ -66,8 +66,6 @@ export const CreateMaterialSchema = z.object({
   type: z.enum(["VIDEO","PDF","PPT"]),
   sourceType: z.enum(["youtube","drive","upload"]),
   sourceUrl: z.string().min(1).refine((value) => value.startsWith("/uploads/") || /^https?:\/\//i.test(value), "Sumber materi harus berupa URL HTTP(S) atau file upload"),
-  duration: z.number().finite().nonnegative().optional(),
-  totalPages: z.number().int().positive().optional(),
   requireCompletionForDownload: z.boolean().optional(),
   isOpen: z.boolean().default(true),
   availableFrom: z.string().datetime().nullable().optional(),
