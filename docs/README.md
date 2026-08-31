@@ -29,7 +29,7 @@ Perubahan schema atau endpoint membutuhkan migration dan redeploy backend serta 
 | **Tracking Progress** | **Download** via `GET /api/materials/:id/download` → `MaterialDownload`; **Slide PDF** `viewedPages JSON` + `percent` via `POST /api/progress/slide {page}` (PdfViewer throttle); **Video** `watchedSec/lastPosition/percent` via `POST /api/progress/video {pos,duration}` (`<video> timeupdate 5s`, YT est.) |
 | **Quiz** | Pretest/Posttest/Quiz per modul, PG 4 opsi, auto-nilai, `passingScore`, `attemptLimit`, `QuizAttempt` |
 | **Rekap Dosen** | `GET /api/progress/rekap/:courseId` → per NIM: `overall = avg(video%+slide%+download)`, `Export CSV` |
-| **Role** | `ADMIN` (kelola user), `DOSEN` (CRUD course/module/material/quiz, lihat rekap), `MAHASISWA` (enroll, baca materi, kerjakan quiz). Tombol `Rekap`/`Kelola` hidden untuk MAHASISWA |
+| **Role** | `ADMIN` (kelola user, backup/restore ZIP), `DOSEN` (CRUD course/module/material/quiz, lihat rekap), `MAHASISWA` (enroll, baca materi, kerjakan quiz). Tombol `Rekap`/`Kelola`/`Backup` hidden untuk MAHASISWA |
 | **Auth** | NIM/password (bcrypt), JWT 7d `Authorization: Bearer`, `iron-session` style httpOnly via `next-auth`/`jsonwebtoken` |
 | **Integrasi SI Utama** | `externalId` nullable, SSO JWT `HS256`, `X-API-Key` untuk export, `docs/INTEGRATION.md` |
 
@@ -188,6 +188,8 @@ Base `http://localhost:4000` / `https://...up.railway.app`
 
 **Integration** `POST /api/integration/auth/sso` `{token: JWT SI Utama}` → `{token: new, user}`
 
+**Backup/restore** `GET /api/backup/download` (ADMIN) mengunduh ZIP logical backup database + `uploads/`; `POST /api/backup/restore` (ADMIN) memulihkan ZIP resmi secara transaksional. Format baru kompatibel PostgreSQL Railway dan SQLite lokal.
+
 **Health** `GET /api/health` → `{ok:true}`
 
 Semua `requireAuth`, `requireRole`, `requireApiKey` di `apps/api/src/middleware/auth.ts`.
@@ -196,7 +198,7 @@ Semua `requireAuth`, `requireRole`, `requireApiKey` di `apps/api/src/middleware/
 
 ## 9. Frontend Routes
 
-`/login`, `/` (Dashboard `Halo, name` + cards), `/courses` (list), `/courses/:id` (modules → materials + quiz pre/post, `Rekap`/`Kelola` hidden untuk MAHASISWA), `/material/:id` (`VideoPlayer` YT/Drive/upload + `PdfViewer` iframe + PPT download), `/quiz/:id` (radio, `Kirim` → score), `/rekap` (DOSEN, tabel `NIM|Nama|Overall|Download|Video|Slide|Quiz` + Export CSV), `/manage` (DOSEN, tambah modul/materi/quiz + upload), `/users` (ADMIN)
+`/login`, `/` (Dashboard `Halo, name` + cards), `/courses` (list), `/courses/:id` (modules → materials + quiz pre/post, `Rekap`/`Kelola` hidden untuk MAHASISWA), `/material/:id` (`VideoPlayer` YT/Drive/upload + `PdfViewer` iframe + PPT download), `/quiz/:id` (radio, `Kirim` → score), `/rekap` (DOSEN, tabel `NIM|Nama|Overall|Download|Video|Slide|Quiz` + Export CSV), `/manage` (DOSEN, tambah modul/materi/quiz + upload), `/users` (ADMIN), `/backup` (ADMIN, backup dan restore ZIP)
 
 ---
 

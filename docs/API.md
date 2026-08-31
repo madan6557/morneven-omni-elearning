@@ -162,6 +162,16 @@ Header: X-API-Key (opsional)
 → {token: "jwt 7d", user}
 ```
 
+## Backup dan restore (ADMIN)
+
+### GET /api/backup/download
+Membuat dan mengunduh `application/zip`. ZIP logical backup berisi `manifest.json`, `data/<model>.json` untuk seluruh model OMNI, dan folder `uploads/` jika tersedia. Format backup kompatibel dengan PostgreSQL Railway dan SQLite lokal. Endpoint memerlukan sesi ADMIN.
+
+### POST /api/backup/restore
+`multipart/form-data` dengan field `file` berformat `.zip`. Restore memvalidasi manifest, path upload, dan seluruh data, lalu mengganti data aktif dalam transaksi database. Endpoint memerlukan sesi ADMIN dan membatasi ukuran upload 1 GB.
+
+Error standar: `BACKUP_FILE_REQUIRED`, `BACKUP_ZIP_REQUIRED`, `BACKUP_FORMAT_UNSUPPORTED`, atau `BACKUP_RESTORE_FAILED`. ZIP lama yang hanya berisi `database.sqlite` tetap didukung pada SQLite lokal; ZIP tersebut tidak dapat dipulihkan ke PostgreSQL.
+
 ### GET /api/health
 → `{ok:true}`
 

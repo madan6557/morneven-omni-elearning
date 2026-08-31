@@ -155,7 +155,9 @@ Pada **Kelola User**, Admin dapat memilih **Edit**, **Password**, atau **Hapus**
 
 ### Backup dan restore
 
-Buat backup sebelum migration atau restore besar. ZIP berisi database dan folder upload. Restore hanya menerima ZIP backup OMNI yang valid dan dapat mengganti data aktif. Simpan salinan backup di lokasi berbeda.
+Menu **Backup / Restore** hanya terlihat oleh **ADMIN**. Tekan **Download backup ZIP** untuk membuat logical backup OMNI yang berisi manifest, seluruh data database (akun, mata kuliah, modul, materi, tugas, quiz, progress, attempt, submission, nilai, notifikasi, dan audit log), serta folder `UPLOAD_DIR`. Format ini dapat dipakai pada PostgreSQL Railway maupun SQLite lokal.
+
+Untuk pemulihan, pilih file `.zip` resmi lalu tekan **Restore ZIP** dan konfirmasi peringatan. Restore mengganti seluruh data aktif dan file upload dengan isi ZIP, memakai transaksi database. ZIP yang rusak, tidak lengkap, atau bukan backup OMNI akan ditolak. Setelah selesai, uji login, mata kuliah, materi, upload, quiz, progress, dan rekap. Selalu buat backup terbaru sebelum restore, simpan backup di lokasi berbeda, dan gunakan volume persisten untuk `UPLOAD_DIR` di Railway. File backup berisi password hash dan data akademik sensitif.
 
 ### Storage
 

@@ -17,6 +17,7 @@ import {
   KeyRound,
   Bell,
   CalendarDays,
+  ArchiveRestore,
 } from "lucide-react";
 
 class RouteErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
@@ -59,6 +60,7 @@ export default function Layout({ children }: { children: any }) {
     { to: "/courses", label: isMhs ? "Matkul Saya" : "Matkul", icon: BookOpen, show: true },
     { to: "/rekap", label: "Rekap Progress", icon: ChartBar, show: isDosen || isAdmin },
     { to: "/users", label: "Kelola User", icon: Users, show: isAdmin },
+    { to: "/backup", label: "Backup / Restore", icon: ArchiveRestore, show: isAdmin },
     { to: "/manage", label: "Kelola Materi & Quiz", icon: Settings2, show: isDosen || isAdmin },
     { to: "/help", label: "Help / Panduan", icon: HelpCircle, show: true },
     { to: "/calendar", label: "Kalender", icon: CalendarDays, show: true },
@@ -66,7 +68,7 @@ export default function Layout({ children }: { children: any }) {
   ];
 
   const visibleItems = navItems.filter((item) => item.show);
-  const contextArticle = location.pathname.startsWith("/quiz/") ? "quiz-basics" : location.pathname.startsWith("/material/") ? "progress-material" : location.pathname.startsWith("/assignment/") ? "assignments" : location.pathname === "/rekap" || location.pathname.startsWith("/rekap/") ? "student-progress" : location.pathname === "/manage" ? "module-management" : location.pathname === "/users" ? "user-management" : null;
+  const contextArticle = location.pathname.startsWith("/quiz/") ? "quiz-basics" : location.pathname.startsWith("/material/") ? "progress-material" : location.pathname.startsWith("/assignment/") ? "assignments" : location.pathname === "/rekap" || location.pathname.startsWith("/rekap/") ? "student-progress" : location.pathname === "/manage" ? "module-management" : location.pathname === "/users" ? "user-management" : location.pathname === "/backup" ? "backup-restore" : null;
   const handleLogout = async () => {
     if (unsavedMessage && !(await requestConfirmation(`Perubahan belum tersimpan: ${unsavedMessage} Jika keluar sekarang, perubahan tersebut akan hilang.`))) return;
     if (!(await requestConfirmation("Anda akan keluar dari workspace dan kembali ke halaman login."))) return;

@@ -18,6 +18,7 @@ import AssignmentSubmissions from "./pages/AssignmentSubmissions";
 import Help from "./pages/Help";
 import Notifications from "./pages/Notifications";
 import Calendar from "./pages/Calendar";
+import BackupRestore from "./pages/BackupRestore";
 const qc=new QueryClient();
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -66,6 +67,7 @@ export default function App(){
             <Route path="/rekap/:courseId/student/:studentId" element={<Protected roles={["ADMIN","DOSEN"]}><Layout><StudentProgress/></Layout></Protected>}/>
             <Route path="/manage" element={<Protected roles={["ADMIN","DOSEN"]}><Layout><Manage/></Layout></Protected>}/>
             <Route path="/users" element={<Protected roles={["ADMIN"]}><Layout><Users/></Layout></Protected>}/>
+            <Route path="/backup" element={<Protected roles={["ADMIN"]}><Layout><BackupRestore/></Layout></Protected>}/>
             <Route path="/help" element={<Protected><Layout><Help/></Layout></Protected>}/>
             <Route path="/notifications" element={<Protected><Layout><Notifications/></Layout></Protected>}/>
             <Route path="/calendar" element={<Protected><Layout><Calendar/></Layout></Protected>}/>
