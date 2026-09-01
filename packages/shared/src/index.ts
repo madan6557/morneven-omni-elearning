@@ -1,7 +1,8 @@
 import { z } from "zod";
 
-// nim juga menampung NIDN dan identifier admin, jadi tidak dibatasi numerik.
-export const IdentifierSchema = z.string().trim().min(3, "Identifier minimal 3 karakter").max(50, "Identifier maksimal 50 karakter").regex(/^[A-Za-z0-9._-]+$/, "Identifier hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda minus");
+// NIM/NIDN dan identifier akun hanya menerima huruf dan angka; simbol dapat
+// menyebabkan salah input dan tidak diperlukan untuk identitas pengguna.
+export const IdentifierSchema = z.string().trim().min(3, "NIM/identifier minimal 3 karakter").max(50, "NIM/identifier maksimal 50 karakter").regex(/^[A-Za-z0-9]+$/, "NIM/identifier hanya boleh berisi huruf dan angka");
 export const PasswordSchema = z.string().min(8, "Password minimal 8 karakter").max(128, "Password maksimal 128 karakter");
 export const LoginSchema = z.object({ nim: IdentifierSchema, password: z.string().min(1, "Password wajib diisi").max(128) });
 export type LoginDTO = z.infer<typeof LoginSchema>;
